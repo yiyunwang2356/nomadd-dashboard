@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Nomadd Haus｜內部待辦管理</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="logo-badge">⌂ Nomadd Haus</div>
+      <h1>內部待辦管理系統</h1>
+      <p>請使用公司 Google 帳號登入<br/>（@nomaddhaus.com）</p>
+      <button class="primary-btn" id="google-login-btn">使用 Google 登入</button>
+    </div>
+  </div>
+
+  <div id="main-app">
+    <div class="shell">
+      <header>
+        <div class="brand">
+          <h1>Nomadd Haus｜待辦管理系統</h1>
+          <p>每週／每月待辦 · 月曆檢視 · 緊急事項 Pin 置頂</p>
+        </div>
+        <div class="user-area">
+          <span class="pill" id="user-name"></span>
+          <button class="ghost-btn" id="logout-btn">登出</button>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <select id="assignee-filter"><option value="全部">全部人員</option></select>
+        <select id="dept-filter">
+          <option value="全部">全部部門</option>
+          <option value="行政">行政</option>
+          <option value="會計">會計</option>
+          <option value="PT">PT</option>
+          <option value="文宣">文宣</option>
+          <option value="場地">場地</option>
+          <option value="行銷">行銷</option>
+        </select>
+        <select id="pin-filter">
+          <option value="全部">全部事項</option>
+          <option value="onlyPinned">只看 Pin</option>
+          <option value="onlyUnpinned">不含 Pin</option>
+        </select>
+        <button class="mode-btn active" id="listModeBtn" onclick="switchMode('list')">清單模式</button>
+        <button class="mode-btn" id="calendarModeBtn" onclick="switchMode('calendar')">月曆模式</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-dept="全部">全部</button>
+        <button class="tab-btn" data-dept="行政">行政</button>
+        <button class="tab-btn" data-dept="會計">會計</button>
+        <button class="tab-btn" data-dept="PT">PT</button>
+        <button class="tab-btn" data-dept="文宣">文宣</button>
+        <button class="tab-btn" data-dept="場地">場地</button>
+        <button class="tab-btn" data-dept="行銷">行銷</button>
+      </div>
+
+      <div id="add-task-form" style="display:none;">
+        <div class="panel-title">➕ 新增待辦事項</div>
+        <div class="add-grid">
+          <input type="text"  id="task-title"    placeholder="待辦事項名稱" />
+          <select id="task-dept">
+            <option value="行政">行政</option>
+            <option value="會計">會計</option>
+            <option value="PT">PT</option>
+            <option value="文宣">文宣</option>
+            <option value="場地">場地</option>
+            <option value="行銷">行銷</option>
+          </select>
+          <select id="task-freq">
+            <option value="每週">每週</option>
+            <option value="每月">每月</option>
+          </select>
+          <input type="text"  id="task-assignee" placeholder="負責人姓名" />
+          <input type="date"  id="task-date" />
+          <button class="ghost-btn" id="new-pin-btn">📌 未 Pin</button>
+          <button class="primary-btn" id="add-task-btn">新增</button>
+        </div>
+      </div>
+
+      <div class="main-grid">
+        <aside class="pinned-panel">
+          <div class="panel-title">📌 緊急待辦</div>
+          <div id="pinned-list" class="pinned-list"></div>
+        </aside>
+        <section class="content-area">
+          <div id="list-view">
+            <div class="task-columns">
+              <div class="column"><h2>📅 每週</h2><ul id="weekly-list"  class="task-list"></ul></div>
+              <div class="column"><h2>🗓 每月</h2><ul id="monthly-list" class="task-list"></ul></div>
+            </div>
+          </div>
+          <div id="calendar-view" style="display:none;">
+            <div class="calendar-card">
+              <div class="calendar-head">
+                <h2 id="calendar-title"></h2>
+                <div class="calendar-nav">
+                  <button class="ghost-btn" onclick="changeMonth(-1)">上個月</button>
+                  <button class="ghost-btn" onclick="changeMonth(1)">下個月</button>
+                </div>
+              </div>
+              <div class="calendar-grid" id="calendar-grid"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
