@@ -94,7 +94,7 @@ onAuthStateChanged(auth, async user => {
 });
 
 function loadMembers() {
-  const q = query(collection(db, "users"), orderBy("name"));
+  const q = query(collection(db, "members"), orderBy("name")); // ← 改這裡
   onSnapshot(q, snapshot => {
     allMembers = snapshot.docs.map(d => d.data()).filter(m => m.name && m.email);
     const sel = document.getElementById("task-assignee");
@@ -277,7 +277,6 @@ function createItem(task) {
   li.className = "task-item" + (task.done ? " done" : "");
   const typeTag = task.taskType === "單次截止" ? '<span class="tag tag-once">單次</span>' : "";
 
-  // 一般顯示模式
   li.innerHTML = `
     <input type="checkbox" ${task.done ? "checked" : ""} />
     <div class="task-content">
@@ -339,7 +338,7 @@ function enterEditMode(li, task) {
         <option value="">選擇負責人</option>
         ${memberOptions}
       </select>
-      <input  class="edit-date"     type="date"  value="${task.dueDate || ""}" />
+      <input  class="edit-date" type="date" value="${task.dueDate || ""}" />
       <div class="edit-actions">
         <button class="primary-btn edit-save">✅ 儲存</button>
         <button class="ghost-btn   edit-cancel">✖ 取消</button>
