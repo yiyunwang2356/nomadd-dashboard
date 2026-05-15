@@ -31,6 +31,7 @@ let currentMode   = "list";
 let newTaskPinned = false;
 let currentMonth  = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let allTasks      = [];
+let allMembers    = [];
 
 const TYPE_HINTS = {
   "每週重複": "🔁 每週重複：每週一自動重置為未完成",
@@ -42,6 +43,12 @@ window.onTypeChange = () => {
   const type = document.getElementById("task-type").value;
   document.getElementById("type-hint").textContent = TYPE_HINTS[type] || "";
   document.getElementById("task-date").placeholder = type === "單次截止" ? "截止日期（必填）" : "截止日期（選填）";
+};
+
+window.onAssigneeChange = () => {
+  const sel = document.getElementById("task-assignee");
+  const selected = sel.options[sel.selectedIndex];
+  document.getElementById("task-assignee-email").value = selected?.dataset.email || "";
 };
 
 document.getElementById("google-login-btn").addEventListener("click", async () => {
@@ -77,6 +84,7 @@ onAuthStateChanged(auth, async user => {
 
     const adminCheck = isAdmin(user.email);
     document.getElementById("add-task-form").style.display = adminCheck ? "block" : "none";
+    loadMembers();
     loadTasks();
   } else {
     currentUser = null;
@@ -84,6 +92,18 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("main-app").style.display     = "none";
   }
 });
+
+function loadMembers() {
+  const q = query(collection(db, "users"), orderBy("name"));
+  onSnapshot(q, snapshot => {
+    allMembers = snapshot.docs.map(d => d.data()).filter(m => m.name && m.email);
+    const sel = document.getElementById("task-assignee");
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">選擇負責人</option>' +
+      allMembers.map(m => `<option value="${m.name}" data-email="${m.email}">${m.name}</option>`).join("");
+    if (cur) sel.value = cur;
+  });
+}
 
 async function autoReset(tasks) {
   const today    = new Date();
@@ -113,21 +133,19 @@ function loadTasks() {
 }
 
 document.getElementById("add-task-btn").addEventListener("click", async () => {
-  const title          = document.getElementById("task-title").value.trim();
-  const dept           = document.getElementById("task-dept").value;
-  const taskType       = document.getElementById("task-type").value;
-  const assignee       = document.getElementById("task-assignee").value.trim();
-  const assigneeEmail  = document.getElementById("task-assignee-email").value.trim(); // ← 新增
-  const dueDate        = document.getElementById("task-date").value;
-
-  if (!title) return alert("請輸入待辦事項名稱");
+  const title         = document.getElementById("task-title").value.trim();
+  const dept          = document.getElementById("task-dept").value;
+  const taskType      = document.getElementById("task-type").value;
+  const assignee      = document.getElementById("task-assignee").value.trim();
+  const assigneeEmail = document.getElementById("task-assignee-email").value.trim();
+  const dueDate       = document.getElementById("task-date").value;
+  if (!title)    return alert("請輸入待辦事項名稱");
+  if (!assignee) return alert("請選擇負責人");
   if (taskType === "單次截止" && !dueDate) return alert("單次截止任務請填入截止日期");
-
   await addDoc(collection(db, "tasks"), {
     title, dept, taskType,
-    assignee:      assignee      || "未指定",
-    assigneeEmail: assigneeEmail || "",        // ← 新增
-    dueDate:       dueDate       || "",
+    assignee, assigneeEmail,
+    dueDate:       dueDate || "",
     pinned:        newTaskPinned,
     done:          false,
     lastResetDate: "",
@@ -135,11 +153,9 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
     createdAt:     serverTimestamp(),
     updatedAt:     serverTimestamp()
   });
-
-  // 清空表單
   document.getElementById("task-title").value          = "";
   document.getElementById("task-assignee").value       = "";
-  document.getElementById("task-assignee-email").value = ""; // ← 新增
+  document.getElementById("task-assignee-email").value = "";
   document.getElementById("task-date").value           = "";
   setPinBtn(false);
 });
@@ -260,6 +276,8 @@ function createItem(task) {
   const li = document.createElement("li");
   li.className = "task-item" + (task.done ? " done" : "");
   const typeTag = task.taskType === "單次截止" ? '<span class="tag tag-once">單次</span>' : "";
+
+  // 一般顯示模式
   li.innerHTML = `
     <input type="checkbox" ${task.done ? "checked" : ""} />
     <div class="task-content">
@@ -271,18 +289,20 @@ function createItem(task) {
       <div class="task-meta">
         <span class="tag tag-dept">${task.dept}</span>
         <span>👤 ${task.assignee}</span>
-        ${task.assigneeEmail ? `<span class="muted">✉️ ${task.assigneeEmail}</span>` : ""}
         ${task.dueDate ? `<span class="tag tag-date">${task.dueDate}</span>` : ""}
       </div>
     </div>
     <div class="row-actions">
+      ${admin ? `<button class="icon-btn" data-action="edit">✏️</button>` : ""}
       ${admin ? `<button class="icon-btn ${task.pinned ? "pin-on" : ""}" data-action="pin">📌</button>` : ""}
       ${admin ? `<button class="icon-btn" data-action="delete">🗑</button>` : ""}
     </div>
   `;
+
   li.querySelector("input[type=checkbox]").addEventListener("change", e =>
     updateDoc(doc(db, "tasks", task.id), { done: e.target.checked, updatedAt: serverTimestamp() })
   );
+
   if (admin) {
     li.querySelector("[data-action=pin]")?.addEventListener("click", () =>
       updateDoc(doc(db, "tasks", task.id), { pinned: !task.pinned, updatedAt: serverTimestamp() })
@@ -290,8 +310,66 @@ function createItem(task) {
     li.querySelector("[data-action=delete]")?.addEventListener("click", () => {
       if (confirm("確定刪除此待辦？")) deleteDoc(doc(db, "tasks", task.id));
     });
+    li.querySelector("[data-action=edit]")?.addEventListener("click", () => {
+      enterEditMode(li, task);
+    });
   }
   return li;
+}
+
+function enterEditMode(li, task) {
+  const memberOptions = allMembers.map(m =>
+    `<option value="${m.name}" data-email="${m.email}" ${m.name === task.assignee ? "selected" : ""}>${m.name}</option>`
+  ).join("");
+
+  li.innerHTML = `
+    <div class="edit-form">
+      <input  class="edit-title"    type="text"  value="${task.title}" placeholder="待辦事項名稱" />
+      <select class="edit-dept">
+        ${["行政","會計","PT","文宣","場地","行銷"].map(d =>
+          `<option ${d === task.dept ? "selected" : ""}>${d}</option>`
+        ).join("")}
+      </select>
+      <select class="edit-type">
+        ${["每週重複","每月重複","單次截止"].map(t =>
+          `<option ${t === task.taskType ? "selected" : ""}>${t}</option>`
+        ).join("")}
+      </select>
+      <select class="edit-assignee">
+        <option value="">選擇負責人</option>
+        ${memberOptions}
+      </select>
+      <input  class="edit-date"     type="date"  value="${task.dueDate || ""}" />
+      <div class="edit-actions">
+        <button class="primary-btn edit-save">✅ 儲存</button>
+        <button class="ghost-btn   edit-cancel">✖ 取消</button>
+      </div>
+    </div>
+  `;
+
+  li.querySelector(".edit-cancel").addEventListener("click", () => renderAll());
+
+  li.querySelector(".edit-save").addEventListener("click", async () => {
+    const newTitle    = li.querySelector(".edit-title").value.trim();
+    const newDept     = li.querySelector(".edit-dept").value;
+    const newType     = li.querySelector(".edit-type").value;
+    const newAssignee = li.querySelector(".edit-assignee").value;
+    const newDate     = li.querySelector(".edit-date").value;
+    const newEmail    = li.querySelector(".edit-assignee")
+                          .options[li.querySelector(".edit-assignee").selectedIndex]
+                          ?.dataset.email || "";
+    if (!newTitle)    return alert("請輸入待辦事項名稱");
+    if (!newAssignee) return alert("請選擇負責人");
+    await updateDoc(doc(db, "tasks", task.id), {
+      title:         newTitle,
+      dept:          newDept,
+      taskType:      newType,
+      assignee:      newAssignee,
+      assigneeEmail: newEmail,
+      dueDate:       newDate || "",
+      updatedAt:     serverTimestamp()
+    });
+  });
 }
 
 function renderCalendar() {
