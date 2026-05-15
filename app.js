@@ -13,12 +13,12 @@ const ADMIN_EMAILS   = ["nomaddhaus@gmail.com"];
 
 function isAllowed(email) {
   if (!email) return false;
-  const emailLower = email.toLowerCase().trim();
-  return emailLower.endsWith("@" + ALLOWED_DOMAIN) || ADMIN_EMAILS.map(e => e.toLowerCase()).includes(emailLower);
+  const e = email.toLowerCase().trim();
+  return e.endsWith("@" + ALLOWED_DOMAIN) || ADMIN_EMAILS.map(x => x.toLowerCase()).includes(e);
 }
 function isAdmin(email) {
   if (!email) return false;
-  return ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase().trim());
+  return ADMIN_EMAILS.map(x => x.toLowerCase()).includes(email.toLowerCase().trim());
 }
 
 const app  = initializeApp(firebaseConfig);
@@ -32,14 +32,23 @@ let newTaskPinned = false;
 let currentMonth  = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let allTasks      = [];
 
+const TYPE_HINTS = {
+  "每週重複": "🔁 每週重複：每週一自動重置為未完成",
+  "每月重複": "📆 每月重複：每月 1 日自動重置為未完成",
+  "單次截止": "📌 單次截止：只有一個 deadline，完成後不重置"
+};
+
+window.onTypeChange = () => {
+  const type = document.getElementById("task-type").value;
+  document.getElementById("type-hint").textContent = TYPE_HINTS[type] || "";
+  document.getElementById("task-date").placeholder = type === "單次截止" ? "截止日期（必填）" : "截止日期（選填）";
+};
+
 document.getElementById("google-login-btn").addEventListener("click", async () => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ hd: ALLOWED_DOMAIN, prompt: "select_account" });
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (e) {
-    alert("登入失敗：" + e.message);
-  }
+  try { await signInWithPopup(auth, provider); }
+  catch (e) { alert("登入失敗：" + e.message); }
 });
 
 document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
@@ -57,21 +66,18 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("user-name").textContent      = user.displayName || user.email;
 
     const userRef = doc(db, "users", user.uid);
-    const snap = await getDoc(userRef);
+    const snap    = await getDoc(userRef);
     if (!snap.exists()) {
       await setDoc(userRef, {
-        name:      user.displayName || "",
-        email:     user.email,
-        role:      isAdmin(user.email) ? "admin" : "staff",
+        name: user.displayName || "", email: user.email,
+        role: isAdmin(user.email) ? "admin" : "staff",
         createdAt: serverTimestamp()
       });
     }
 
     const adminCheck = isAdmin(user.email);
-    console.log("登入帳號:", user.email, "| 管理員:", adminCheck);
     document.getElementById("add-task-form").style.display = adminCheck ? "block" : "none";
     loadTasks();
-    populateAssigneeFilter();
   } else {
     currentUser = null;
     document.getElementById("login-screen").style.display = "flex";
@@ -79,10 +85,28 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
+async function autoReset(tasks) {
+  const today    = new Date();
+  const todayStr = fmtDate(today);
+  const isMonday = today.getDay() === 1;
+  const isFirst  = today.getDate() === 1;
+  for (const task of tasks) {
+    if (!task.done) continue;
+    const lastReset = task.lastResetDate || "";
+    if (task.taskType === "每週重複" && isMonday && lastReset !== todayStr) {
+      await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+    }
+    if (task.taskType === "每月重複" && isFirst && lastReset !== todayStr) {
+      await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+    }
+  }
+}
+
 function loadTasks() {
   const q = query(collection(db, "tasks"), orderBy("createdAt", "desc"));
-  onSnapshot(q, snapshot => {
+  onSnapshot(q, async snapshot => {
     allTasks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    await autoReset(allTasks);
     populateAssigneeFilter();
     renderAll();
   });
@@ -91,19 +115,21 @@ function loadTasks() {
 document.getElementById("add-task-btn").addEventListener("click", async () => {
   const title    = document.getElementById("task-title").value.trim();
   const dept     = document.getElementById("task-dept").value;
-  const freq     = document.getElementById("task-freq").value;
+  const taskType = document.getElementById("task-type").value;
   const assignee = document.getElementById("task-assignee").value.trim();
   const dueDate  = document.getElementById("task-date").value;
   if (!title) return alert("請輸入待辦事項名稱");
+  if (taskType === "單次截止" && !dueDate) return alert("單次截止任務請填入截止日期");
   await addDoc(collection(db, "tasks"), {
-    title, dept, freq,
-    assignee:  assignee || "未指定",
-    dueDate:   dueDate  || "",
-    pinned:    newTaskPinned,
-    done:      false,
-    createdBy: currentUser.uid,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    title, dept, taskType,
+    assignee:      assignee || "未指定",
+    dueDate:       dueDate  || "",
+    pinned:        newTaskPinned,
+    done:          false,
+    lastResetDate: "",
+    createdBy:     currentUser.uid,
+    createdAt:     serverTimestamp(),
+    updatedAt:     serverTimestamp()
   });
   document.getElementById("task-title").value    = "";
   document.getElementById("task-assignee").value = "";
@@ -115,10 +141,10 @@ document.getElementById("new-pin-btn").addEventListener("click", () => setPinBtn
 function setPinBtn(state) {
   newTaskPinned = state;
   const btn = document.getElementById("new-pin-btn");
-  btn.textContent        = state ? "📌 已 Pin" : "📌 未 Pin";
-  btn.style.background   = state ? "#FFF3E8"   : "white";
-  btn.style.borderColor  = state ? "#f0cda3"   : "#E7DDD0";
-  btn.style.color        = state ? "#C96F16"   : "#4B443D";
+  btn.textContent       = state ? "📌 已 Pin" : "📌 未 Pin";
+  btn.style.background  = state ? "#FFF3E8"   : "white";
+  btn.style.borderColor = state ? "#f0cda3"   : "#E7DDD0";
+  btn.style.color       = state ? "#C96F16"   : "#4B443D";
 }
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -139,8 +165,9 @@ document.getElementById("dept-filter").addEventListener("change", e => {
   renderAll();
 });
 
-document.getElementById("assignee-filter").addEventListener("change", renderAll);
-document.getElementById("pin-filter").addEventListener("change", renderAll);
+["assignee-filter","pin-filter","type-filter"].forEach(id =>
+  document.getElementById(id).addEventListener("change", renderAll)
+);
 
 window.switchMode = mode => {
   currentMode = mode;
@@ -157,17 +184,19 @@ window.changeMonth = offset => {
 };
 
 function getFiltered() {
-  const assignee  = document.getElementById("assignee-filter").value;
-  const pinFilter = document.getElementById("pin-filter").value;
+  const assignee   = document.getElementById("assignee-filter").value;
+  const pinFilter  = document.getElementById("pin-filter").value;
+  const typeFilter = document.getElementById("type-filter").value;
   let list = [...allTasks];
-  if (currentDept !== "全部") list = list.filter(t => t.dept === currentDept);
-  if (assignee    !== "全部") list = list.filter(t => t.assignee === assignee);
+  if (currentDept  !== "全部") list = list.filter(t => t.dept === currentDept);
+  if (assignee     !== "全部") list = list.filter(t => t.assignee === assignee);
+  if (typeFilter   !== "全部") list = list.filter(t => t.taskType === typeFilter);
   if (pinFilter === "onlyPinned")   list = list.filter(t => t.pinned);
   if (pinFilter === "onlyUnpinned") list = list.filter(t => !t.pinned);
   list.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     if (a.done   !== b.done)   return a.done   ?  1 : -1;
-    return (a.dueDate || "").localeCompare(b.dueDate || "");
+    return (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
   });
   return list;
 }
@@ -196,8 +225,8 @@ function renderPinned() {
         <span class="pin-badge">PIN</span>
         <span class="muted">${t.dueDate || "未設定"}</span>
       </div>
-      <div style="font-weight:800;margin-bottom:6px">${t.title}</div>
-      <div class="muted">${t.dept}｜${t.assignee}｜${t.freq}</div>
+      <div style="font-weight:800;font-size:.92rem;margin-bottom:4px">${t.title}</div>
+      <div class="muted">${t.dept}｜${t.assignee}｜${t.taskType}</div>
     </div>
   `).join("");
 }
@@ -205,32 +234,36 @@ function renderPinned() {
 function renderList() {
   const wl = document.getElementById("weekly-list");
   const ml = document.getElementById("monthly-list");
-  wl.innerHTML = "";
-  ml.innerHTML = "";
+  const ol = document.getElementById("once-list");
+  wl.innerHTML = ml.innerHTML = ol.innerHTML = "";
   const filtered = getFiltered();
-  const weekly   = filtered.filter(t => t.freq === "每週");
-  const monthly  = filtered.filter(t => t.freq === "每月");
-  if (!weekly.length)  wl.innerHTML = '<div class="empty">目前無每週待辦</div>';
-  if (!monthly.length) ml.innerHTML = '<div class="empty">目前無每月待辦</div>';
+  const weekly  = filtered.filter(t => t.taskType === "每週重複");
+  const monthly = filtered.filter(t => t.taskType === "每月重複");
+  const once    = filtered.filter(t => t.taskType === "單次截止" || !t.taskType);
+  if (!weekly.length)  wl.innerHTML = '<div class="empty">目前無每週重複待辦</div>';
+  if (!monthly.length) ml.innerHTML = '<div class="empty">目前無每月重複待辦</div>';
+  if (!once.length)    ol.innerHTML = '<div class="empty">目前無單次截止待辦</div>';
   weekly.forEach(t  => wl.appendChild(createItem(t)));
   monthly.forEach(t => ml.appendChild(createItem(t)));
+  once.forEach(t    => ol.appendChild(createItem(t)));
 }
 
 function createItem(task) {
   const admin = isAdmin(currentUser?.email);
   const li = document.createElement("li");
   li.className = "task-item" + (task.done ? " done" : "");
+  const typeTag = task.taskType === "單次截止" ? '<span class="tag tag-once">單次</span>' : "";
   li.innerHTML = `
     <input type="checkbox" ${task.done ? "checked" : ""} />
     <div class="task-content">
       <div class="task-title-row">
         <span class="task-title">${task.title}</span>
         ${task.pinned ? '<span class="tag tag-pin">📌 緊急</span>' : ""}
+        ${typeTag}
       </div>
       <div class="task-meta">
         <span class="tag tag-dept">${task.dept}</span>
         <span>👤 ${task.assignee}</span>
-        <span>${task.freq}</span>
         ${task.dueDate ? `<span class="tag tag-date">${task.dueDate}</span>` : ""}
       </div>
     </div>
@@ -262,8 +295,7 @@ function renderCalendar() {
   grid.innerHTML    = "";
   ["日","一","二","三","四","五","六"].forEach(d => {
     const el = document.createElement("div");
-    el.className = "weekday";
-    el.textContent = d;
+    el.className = "weekday"; el.textContent = d;
     grid.appendChild(el);
   });
   const firstDay    = new Date(year, month, 1).getDay();
@@ -272,8 +304,8 @@ function renderCalendar() {
   const filtered    = getFiltered();
   for (let i = 0; i < 42; i++) {
     let d, cur = true;
-    if (i < firstDay)                     { d = new Date(year, month - 1, prevDays - firstDay + i + 1); cur = false; }
-    else if (i >= firstDay + daysInMonth) { d = new Date(year, month + 1, i - (firstDay + daysInMonth) + 1); cur = false; }
+    if (i < firstDay)                     { d = new Date(year, month-1, prevDays - firstDay + i + 1); cur = false; }
+    else if (i >= firstDay + daysInMonth) { d = new Date(year, month+1, i - (firstDay + daysInMonth) + 1); cur = false; }
     else                                  { d = new Date(year, month, i - firstDay + 1); }
     const dateStr  = fmtDate(d);
     const dayTasks = filtered.filter(t => t.dueDate === dateStr);
@@ -281,16 +313,16 @@ function renderCalendar() {
     cell.className = "day-cell" + (cur ? "" : " other-month");
     cell.innerHTML = `<div class="day-num">${d.getDate()}</div><div class="day-events"></div>`;
     const evWrap   = cell.querySelector(".day-events");
-    dayTasks.slice(0, 3).forEach(t => {
+    dayTasks.slice(0, 2).forEach(t => {
       const chip = document.createElement("div");
       chip.className   = "event-chip" + (t.pinned ? " pin" : "");
       chip.textContent = `${t.assignee}｜${t.title}`;
       evWrap.appendChild(chip);
     });
-    if (dayTasks.length > 3) {
+    if (dayTasks.length > 2) {
       const more = document.createElement("div");
       more.className   = "event-chip";
-      more.textContent = `+${dayTasks.length - 3} more`;
+      more.textContent = `+${dayTasks.length - 2}`;
       evWrap.appendChild(more);
     }
     grid.appendChild(cell);

@@ -23,7 +23,7 @@
       <header>
         <div class="brand">
           <h1>Nomadd Haus｜待辦管理系統</h1>
-          <p>每週／每月待辦 · 月曆檢視 · 緊急事項 Pin 置頂</p>
+          <p>重複任務自動重置 · 月曆檢視 · 緊急事項 Pin 置頂</p>
         </div>
         <div class="user-area">
           <span class="pill" id="user-name"></span>
@@ -42,13 +42,19 @@
           <option value="場地">場地</option>
           <option value="行銷">行銷</option>
         </select>
+        <select id="type-filter">
+          <option value="全部">全部類型</option>
+          <option value="每週重複">每週重複</option>
+          <option value="每月重複">每月重複</option>
+          <option value="單次截止">單次截止</option>
+        </select>
         <select id="pin-filter">
           <option value="全部">全部事項</option>
           <option value="onlyPinned">只看 Pin</option>
           <option value="onlyUnpinned">不含 Pin</option>
         </select>
-        <button class="mode-btn active" id="listModeBtn" onclick="switchMode('list')">清單模式</button>
-        <button class="mode-btn" id="calendarModeBtn" onclick="switchMode('calendar')">月曆模式</button>
+        <button class="mode-btn active" id="listModeBtn" onclick="switchMode('list')">清單</button>
+        <button class="mode-btn" id="calendarModeBtn" onclick="switchMode('calendar')">月曆</button>
       </div>
 
       <div class="tabs">
@@ -64,7 +70,7 @@
       <div id="add-task-form" style="display:none;">
         <div class="panel-title">➕ 新增待辦事項</div>
         <div class="add-grid">
-          <input type="text"  id="task-title"    placeholder="待辦事項名稱" />
+          <input type="text" id="task-title" placeholder="待辦事項名稱" />
           <select id="task-dept">
             <option value="行政">行政</option>
             <option value="會計">會計</option>
@@ -73,15 +79,17 @@
             <option value="場地">場地</option>
             <option value="行銷">行銷</option>
           </select>
-          <select id="task-freq">
-            <option value="每週">每週</option>
-            <option value="每月">每月</option>
+          <select id="task-type" onchange="onTypeChange()">
+            <option value="每週重複">每週重複</option>
+            <option value="每月重複">每月重複</option>
+            <option value="單次截止">單次截止</option>
           </select>
           <input type="text"  id="task-assignee" placeholder="負責人姓名" />
           <input type="date"  id="task-date" />
           <button class="ghost-btn" id="new-pin-btn">📌 未 Pin</button>
           <button class="primary-btn" id="add-task-btn">新增</button>
         </div>
+        <div id="type-hint" class="type-hint">🔁 每週重複：每週一自動重置為未完成</div>
       </div>
 
       <div class="main-grid">
@@ -92,17 +100,18 @@
         <section class="content-area">
           <div id="list-view">
             <div class="task-columns">
-              <div class="column"><h2>📅 每週</h2><ul id="weekly-list"  class="task-list"></ul></div>
-              <div class="column"><h2>🗓 每月</h2><ul id="monthly-list" class="task-list"></ul></div>
+              <div class="column"><h2>🔁 每週重複</h2><ul id="weekly-list"  class="task-list"></ul></div>
+              <div class="column"><h2>📆 每月重複</h2><ul id="monthly-list" class="task-list"></ul></div>
             </div>
+            <div class="column full-col" style="margin-top:16px"><h2>📌 單次截止</h2><ul id="once-list" class="task-list"></ul></div>
           </div>
           <div id="calendar-view" style="display:none;">
             <div class="calendar-card">
               <div class="calendar-head">
                 <h2 id="calendar-title"></h2>
                 <div class="calendar-nav">
-                  <button class="ghost-btn" onclick="changeMonth(-1)">上個月</button>
-                  <button class="ghost-btn" onclick="changeMonth(1)">下個月</button>
+                  <button class="ghost-btn" onclick="changeMonth(-1)">◀</button>
+                  <button class="ghost-btn" onclick="changeMonth(1)">▶</button>
                 </div>
               </div>
               <div class="calendar-grid" id="calendar-grid"></div>
