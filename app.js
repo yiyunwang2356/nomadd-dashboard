@@ -113,17 +113,21 @@ function loadTasks() {
 }
 
 document.getElementById("add-task-btn").addEventListener("click", async () => {
-  const title    = document.getElementById("task-title").value.trim();
-  const dept     = document.getElementById("task-dept").value;
-  const taskType = document.getElementById("task-type").value;
-  const assignee = document.getElementById("task-assignee").value.trim();
-  const dueDate  = document.getElementById("task-date").value;
+  const title          = document.getElementById("task-title").value.trim();
+  const dept           = document.getElementById("task-dept").value;
+  const taskType       = document.getElementById("task-type").value;
+  const assignee       = document.getElementById("task-assignee").value.trim();
+  const assigneeEmail  = document.getElementById("task-assignee-email").value.trim(); // ← 新增
+  const dueDate        = document.getElementById("task-date").value;
+
   if (!title) return alert("請輸入待辦事項名稱");
   if (taskType === "單次截止" && !dueDate) return alert("單次截止任務請填入截止日期");
+
   await addDoc(collection(db, "tasks"), {
     title, dept, taskType,
-    assignee:      assignee || "未指定",
-    dueDate:       dueDate  || "",
+    assignee:      assignee      || "未指定",
+    assigneeEmail: assigneeEmail || "",        // ← 新增
+    dueDate:       dueDate       || "",
     pinned:        newTaskPinned,
     done:          false,
     lastResetDate: "",
@@ -131,9 +135,12 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
     createdAt:     serverTimestamp(),
     updatedAt:     serverTimestamp()
   });
-  document.getElementById("task-title").value    = "";
-  document.getElementById("task-assignee").value = "";
-  document.getElementById("task-date").value     = "";
+
+  // 清空表單
+  document.getElementById("task-title").value          = "";
+  document.getElementById("task-assignee").value       = "";
+  document.getElementById("task-assignee-email").value = ""; // ← 新增
+  document.getElementById("task-date").value           = "";
   setPinBtn(false);
 });
 
@@ -264,6 +271,7 @@ function createItem(task) {
       <div class="task-meta">
         <span class="tag tag-dept">${task.dept}</span>
         <span>👤 ${task.assignee}</span>
+        ${task.assigneeEmail ? `<span class="muted">✉️ ${task.assigneeEmail}</span>` : ""}
         ${task.dueDate ? `<span class="tag tag-date">${task.dueDate}</span>` : ""}
       </div>
     </div>

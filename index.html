@@ -9,6 +9,7 @@
 </head>
 <body>
 
+
   <div id="login-screen">
     <div class="login-card">
       <div class="logo-badge">⌂ Nomadd Haus</div>
@@ -17,6 +18,7 @@
       <button class="primary-btn" id="google-login-btn">使用 Google 登入</button>
     </div>
   </div>
+
 
   <div id="main-app">
     <div class="shell">
@@ -30,6 +32,7 @@
           <button class="ghost-btn" id="logout-btn">登出</button>
         </div>
       </header>
+
 
       <div class="toolbar">
         <select id="assignee-filter"><option value="全部">全部人員</option></select>
@@ -57,6 +60,7 @@
         <button class="mode-btn" id="calendarModeBtn" onclick="switchMode('calendar')">月曆</button>
       </div>
 
+
       <div class="tabs">
         <button class="tab-btn active" data-dept="全部">全部</button>
         <button class="tab-btn" data-dept="行政">行政</button>
@@ -67,10 +71,11 @@
         <button class="tab-btn" data-dept="行銷">行銷</button>
       </div>
 
+
       <div id="add-task-form" style="display:none;">
         <div class="panel-title">➕ 新增待辦事項</div>
         <div class="add-grid">
-          <input type="text" id="task-title" placeholder="待辦事項名稱" />
+          <input type="text"  id="task-title"          placeholder="待辦事項名稱" />
           <select id="task-dept">
             <option value="行政">行政</option>
             <option value="會計">會計</option>
@@ -84,13 +89,15 @@
             <option value="每月重複">每月重複</option>
             <option value="單次截止">單次截止</option>
           </select>
-          <input type="text"  id="task-assignee" placeholder="負責人姓名" />
+          <input type="text"  id="task-assignee"       placeholder="負責人姓名" />
+          <input type="email" id="task-assignee-email" placeholder="負責人 Email（用於通知）" />
           <input type="date"  id="task-date" />
-          <button class="ghost-btn" id="new-pin-btn">📌 未 Pin</button>
+          <button class="ghost-btn"   id="new-pin-btn">📌 未 Pin</button>
           <button class="primary-btn" id="add-task-btn">新增</button>
         </div>
         <div id="type-hint" class="type-hint">🔁 每週重複：每週一自動重置為未完成</div>
       </div>
+
 
       <div class="main-grid">
         <aside class="pinned-panel">
@@ -121,6 +128,7 @@
       </div>
     </div>
   </div>
+
 
   <script type="module" src="app.js"></script>
 </body>
