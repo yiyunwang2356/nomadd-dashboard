@@ -12,10 +12,13 @@ const ALLOWED_DOMAIN = "nomaddhaus.com";
 const ADMIN_EMAILS   = ["nomaddhaus@gmail.com"];
 
 function isAllowed(email) {
-  return email && (email.endsWith("@" + ALLOWED_DOMAIN) || ADMIN_EMAILS.includes(email));
+  if (!email) return false;
+  const emailLower = email.toLowerCase().trim();
+  return emailLower.endsWith("@" + ALLOWED_DOMAIN) || ADMIN_EMAILS.map(e => e.toLowerCase()).includes(emailLower);
 }
 function isAdmin(email) {
-  return ADMIN_EMAILS.includes(email);
+  if (!email) return false;
+  return ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase().trim());
 }
 
 const app  = initializeApp(firebaseConfig);
@@ -64,7 +67,9 @@ onAuthStateChanged(auth, async user => {
       });
     }
 
-    document.getElementById("add-task-form").style.display = isAdmin(user.email) ? "block" : "none";
+    const adminCheck = isAdmin(user.email);
+    console.log("登入帳號:", user.email, "| 管理員:", adminCheck);
+    document.getElementById("add-task-form").style.display = adminCheck ? "block" : "none";
     loadTasks();
     populateAssigneeFilter();
   } else {
