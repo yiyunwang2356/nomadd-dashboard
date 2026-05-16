@@ -25,13 +25,15 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-let currentUser   = null;
-let currentDept   = "全部";
-let currentMode   = "list";
-let newTaskPinned = false;
-let currentMonth  = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-let allTasks      = [];
-let allMembers    = [];
+let currentUser      = null;
+let currentDept      = "全部";
+let currentMode      = "list";
+let newTaskPinned    = false;
+let currentMonth     = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let allTasks         = [];
+let allMembers       = [];
+let calendarMember   = "全部";   // ← 月曆人員 Tab 目前選的
+let selectedDate     = null;     // ← 點擊的日期
 
 const TYPE_HINTS = {
   "每週重複": "🔁 每週重複：每週一自動重置為未完成",
@@ -94,14 +96,38 @@ onAuthStateChanged(auth, async user => {
 });
 
 function loadMembers() {
-  const q = query(collection(db, "members"), orderBy("name")); // ← 改這裡
+  const q = query(collection(db, "members"), orderBy("name"));
   onSnapshot(q, snapshot => {
     allMembers = snapshot.docs.map(d => d.data()).filter(m => m.name && m.email);
+
+    // 新增任務下拉
     const sel = document.getElementById("task-assignee");
     const cur = sel.value;
     sel.innerHTML = '<option value="">選擇負責人</option>' +
       allMembers.map(m => `<option value="${m.name}" data-email="${m.email}">${m.name}</option>`).join("");
     if (cur) sel.value = cur;
+
+    // 月曆人員 Tab
+    renderCalendarMemberTabs();
+  });
+}
+
+function renderCalendarMemberTabs() {
+  const wrap = document.getElementById("cal-member-tabs");
+  wrap.innerHTML = '<button class="cal-tab-btn active" data-member="全部">全部</button>' +
+    allMembers.map(m =>
+      `<button class="cal-tab-btn" data-member="${m.name}">${m.name}</button>`
+    ).join("");
+
+  wrap.querySelectorAll(".cal-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      wrap.querySelectorAll(".cal-tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      calendarMember = btn.dataset.member;
+      selectedDate   = null;
+      hideDayDetail();
+      renderCalendar();
+    });
   });
 }
 
@@ -203,6 +229,8 @@ window.switchMode = mode => {
 
 window.changeMonth = offset => {
   currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
+  selectedDate = null;
+  hideDayDetail();
   renderCalendar();
 };
 
@@ -221,6 +249,13 @@ function getFiltered() {
     if (a.done   !== b.done)   return a.done   ?  1 : -1;
     return (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
   });
+  return list;
+}
+
+// 月曆用的篩選（依 calendarMember）
+function getCalendarFiltered() {
+  let list = [...allTasks];
+  if (calendarMember !== "全部") list = list.filter(t => t.assignee === calendarMember);
   return list;
 }
 
@@ -276,7 +311,6 @@ function createItem(task) {
   const li = document.createElement("li");
   li.className = "task-item" + (task.done ? " done" : "");
   const typeTag = task.taskType === "單次截止" ? '<span class="tag tag-once">單次</span>' : "";
-
   li.innerHTML = `
     <input type="checkbox" ${task.done ? "checked" : ""} />
     <div class="task-content">
@@ -297,11 +331,9 @@ function createItem(task) {
       ${admin ? `<button class="icon-btn" data-action="delete">🗑</button>` : ""}
     </div>
   `;
-
   li.querySelector("input[type=checkbox]").addEventListener("change", e =>
     updateDoc(doc(db, "tasks", task.id), { done: e.target.checked, updatedAt: serverTimestamp() })
   );
-
   if (admin) {
     li.querySelector("[data-action=pin]")?.addEventListener("click", () =>
       updateDoc(doc(db, "tasks", task.id), { pinned: !task.pinned, updatedAt: serverTimestamp() })
@@ -320,10 +352,9 @@ function enterEditMode(li, task) {
   const memberOptions = allMembers.map(m =>
     `<option value="${m.name}" data-email="${m.email}" ${m.name === task.assignee ? "selected" : ""}>${m.name}</option>`
   ).join("");
-
   li.innerHTML = `
     <div class="edit-form">
-      <input  class="edit-title"    type="text"  value="${task.title}" placeholder="待辦事項名稱" />
+      <input  class="edit-title" type="text" value="${task.title}" placeholder="待辦事項名稱" />
       <select class="edit-dept">
         ${["行政","會計","PT","文宣","場地","行銷"].map(d =>
           `<option ${d === task.dept ? "selected" : ""}>${d}</option>`
@@ -338,16 +369,14 @@ function enterEditMode(li, task) {
         <option value="">選擇負責人</option>
         ${memberOptions}
       </select>
-      <input  class="edit-date" type="date" value="${task.dueDate || ""}" />
+      <input class="edit-date" type="date" value="${task.dueDate || ""}" />
       <div class="edit-actions">
         <button class="primary-btn edit-save">✅ 儲存</button>
-        <button class="ghost-btn   edit-cancel">✖ 取消</button>
+        <button class="ghost-btn edit-cancel">✖ 取消</button>
       </div>
     </div>
   `;
-
   li.querySelector(".edit-cancel").addEventListener("click", () => renderAll());
-
   li.querySelector(".edit-save").addEventListener("click", async () => {
     const newTitle    = li.querySelector(".edit-title").value.trim();
     const newDept     = li.querySelector(".edit-dept").value;
@@ -360,15 +389,17 @@ function enterEditMode(li, task) {
     if (!newTitle)    return alert("請輸入待辦事項名稱");
     if (!newAssignee) return alert("請選擇負責人");
     await updateDoc(doc(db, "tasks", task.id), {
-      title:         newTitle,
-      dept:          newDept,
-      taskType:      newType,
-      assignee:      newAssignee,
-      assigneeEmail: newEmail,
-      dueDate:       newDate || "",
-      updatedAt:     serverTimestamp()
+      title: newTitle, dept: newDept, taskType: newType,
+      assignee: newAssignee, assigneeEmail: newEmail,
+      dueDate: newDate || "", updatedAt: serverTimestamp()
     });
   });
+}
+
+// ─── 月曆 ───────────────────────────────────────────
+
+function isMobile() {
+  return window.innerWidth <= 640;
 }
 
 function renderCalendar() {
@@ -378,40 +409,98 @@ function renderCalendar() {
   const month = currentMonth.getMonth();
   title.textContent = `${year} 年 ${month + 1} 月`;
   grid.innerHTML    = "";
+
   ["日","一","二","三","四","五","六"].forEach(d => {
     const el = document.createElement("div");
     el.className = "weekday"; el.textContent = d;
     grid.appendChild(el);
   });
+
   const firstDay    = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevDays    = new Date(year, month, 0).getDate();
-  const filtered    = getFiltered();
+  const filtered    = getCalendarFiltered();
+  const mobile      = isMobile();
+
   for (let i = 0; i < 42; i++) {
     let d, cur = true;
     if (i < firstDay)                     { d = new Date(year, month-1, prevDays - firstDay + i + 1); cur = false; }
     else if (i >= firstDay + daysInMonth) { d = new Date(year, month+1, i - (firstDay + daysInMonth) + 1); cur = false; }
     else                                  { d = new Date(year, month, i - firstDay + 1); }
+
     const dateStr  = fmtDate(d);
     const dayTasks = filtered.filter(t => t.dueDate === dateStr);
-    const cell     = document.createElement("div");
-    cell.className = "day-cell" + (cur ? "" : " other-month");
-    cell.innerHTML = `<div class="day-num">${d.getDate()}</div><div class="day-events"></div>`;
-    const evWrap   = cell.querySelector(".day-events");
-    dayTasks.slice(0, 2).forEach(t => {
-      const chip = document.createElement("div");
-      chip.className   = "event-chip" + (t.pinned ? " pin" : "");
-      chip.textContent = `${t.assignee}｜${t.title}`;
-      evWrap.appendChild(chip);
-    });
-    if (dayTasks.length > 2) {
-      const more = document.createElement("div");
-      more.className   = "event-chip";
-      more.textContent = `+${dayTasks.length - 2}`;
-      evWrap.appendChild(more);
+    const isSelected = selectedDate === dateStr;
+
+    const cell = document.createElement("div");
+    cell.className = "day-cell" +
+      (cur ? "" : " other-month") +
+      (isSelected ? " selected" : "");
+    cell.dataset.date = dateStr;
+
+    if (mobile) {
+      // 手機：圓點模式
+      const dots = dayTasks.length > 0
+        ? `<div class="day-dots">${dayTasks.slice(0,3).map(t =>
+            `<span class="day-dot${t.pinned ? " pin" : ""}"></span>`
+          ).join("")}${dayTasks.length > 3 ? `<span class="day-dot-more">+${dayTasks.length - 3}</span>` : ""}</div>`
+        : "";
+      cell.innerHTML = `<div class="day-num">${d.getDate()}</div>${dots}`;
+
+      if (cur && dayTasks.length > 0) {
+        cell.style.cursor = "pointer";
+        cell.addEventListener("click", () => {
+          if (selectedDate === dateStr) {
+            selectedDate = null;
+            hideDayDetail();
+            cell.classList.remove("selected");
+          } else {
+            selectedDate = dateStr;
+            document.querySelectorAll(".day-cell.selected").forEach(c => c.classList.remove("selected"));
+            cell.classList.add("selected");
+            showDayDetail(dateStr, dayTasks);
+          }
+        });
+      }
+    } else {
+      // 電腦：原本的 event chip 模式
+      cell.innerHTML = `<div class="day-num">${d.getDate()}</div><div class="day-events"></div>`;
+      const evWrap = cell.querySelector(".day-events");
+      dayTasks.slice(0, 2).forEach(t => {
+        const chip = document.createElement("div");
+        chip.className   = "event-chip" + (t.pinned ? " pin" : "");
+        chip.textContent = `${t.assignee}｜${t.title}`;
+        evWrap.appendChild(chip);
+      });
+      if (dayTasks.length > 2) {
+        const more = document.createElement("div");
+        more.className   = "event-chip";
+        more.textContent = `+${dayTasks.length - 2}`;
+        evWrap.appendChild(more);
+      }
     }
+
     grid.appendChild(cell);
   }
+}
+
+function showDayDetail(dateStr, tasks) {
+  const wrap  = document.getElementById("cal-day-detail");
+  const title = document.getElementById("cal-day-detail-title");
+  const list  = document.getElementById("cal-day-task-list");
+  title.textContent = `📅 ${dateStr} 的待辦（${tasks.length} 項）`;
+  list.innerHTML = tasks.map(t => `
+    <li class="cal-day-task-item ${t.done ? "done" : ""}">
+      <span class="cal-day-task-title">${t.done ? "✅" : "⬜"} ${t.title}</span>
+      <span class="cal-day-task-meta">${t.dept}｜👤 ${t.assignee}</span>
+    </li>
+  `).join("");
+  wrap.style.display = "block";
+}
+
+function hideDayDetail() {
+  document.getElementById("cal-day-detail").style.display = "none";
+  document.getElementById("cal-day-task-list").innerHTML  = "";
 }
 
 function fmtDate(date) {

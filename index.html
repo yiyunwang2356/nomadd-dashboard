@@ -120,7 +120,20 @@
                   <button class="ghost-btn" onclick="changeMonth(1)">▶</button>
                 </div>
               </div>
+
+              <!-- 月曆人員 Tab ← 新增 -->
+              <div class="cal-member-tabs" id="cal-member-tabs">
+                <button class="cal-tab-btn active" data-member="全部">全部</button>
+              </div>
+
               <div class="calendar-grid" id="calendar-grid"></div>
+
+              <!-- 點擊日期後展開的任務清單 ← 新增 -->
+              <div id="cal-day-detail" class="cal-day-detail" style="display:none;">
+                <div class="cal-day-detail-title" id="cal-day-detail-title"></div>
+                <ul class="cal-day-task-list" id="cal-day-task-list"></ul>
+              </div>
+
             </div>
           </div>
         </section>
