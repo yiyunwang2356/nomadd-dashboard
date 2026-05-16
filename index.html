@@ -88,7 +88,10 @@
             <option value="">選擇負責人</option>
           </select>
           <input type="email" id="task-assignee-email" placeholder="負責人 Email（自動帶入）" readonly />
-          <input type="date" id="task-date" />
+          <div class="date-wrap">
+            <label class="date-label">📅 截止日期</label>
+            <input type="date" id="task-date" />
+          </div>
           <button class="ghost-btn" id="new-pin-btn">📌 未 Pin</button>
           <button class="primary-btn" id="add-task-btn">新增</button>
         </div>
