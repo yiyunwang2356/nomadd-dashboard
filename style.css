@@ -55,15 +55,16 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
   padding:20px; margin-bottom:20px; }
 .panel-title { font-weight:800; font-size:.95rem; margin-bottom:14px; color:#C96F16; }
 .add-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr));
-  gap:10px; align-items:stretch; }
+  gap:10px; align-items:stretch; overflow:hidden; }
+.add-grid > * { min-width:0; max-width:100%; }
 .add-grid input, .add-grid select { border:1.5px solid #E7DDD0; border-radius:8px;
-  padding:8px 12px; font-size:.85rem; background:#fff; width:100%; height:38px; }
+  padding:8px 12px; font-size:.85rem; background:#fff; width:100%; height:38px;
+  min-width:0; max-width:100%; box-sizing:border-box; }
+.add-grid input[type="date"] { padding:0 10px; }
 .add-grid input:focus, .add-grid select:focus { outline:none; border-color:#C96F16; }
 .add-grid .primary-btn, .add-grid .ghost-btn { height:38px; padding:0 16px;
-  font-size:.85rem; width:100%; }
+  font-size:.85rem; width:100%; min-width:0; }
 .type-hint { font-size:.78rem; color:#7A6E66; margin-top:10px; }
-.date-wrap { display:flex; flex-direction:column; gap:4px; }
-.date-label { font-size:.75rem; color:#7A6E66; font-weight:600; }
 
 /* ── Main Grid ────────────────────────────────── */
 .main-grid { display:grid; grid-template-columns:220px 1fr; gap:20px; align-items:start; }
@@ -178,8 +179,7 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
   .add-grid      { grid-template-columns:1fr; }
   .add-grid input, .add-grid select,
   .add-grid .primary-btn, .add-grid .ghost-btn { width:100%; max-width:100%; }
-  .date-wrap     { width:100%; }
-  .add-grid input[type="date"] { width:100%; min-width:0; }
+  .add-grid input[type="date"] { width:100%; min-width:0; padding:0 10px; }
 
   /* 手機月曆格縮小 */
   .day-cell      { min-height:52px; padding:4px; }
