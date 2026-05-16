@@ -25,15 +25,15 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-let currentUser      = null;
-let currentDept      = "全部";
-let currentMode      = "list";
-let newTaskPinned    = false;
-let currentMonth     = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-let allTasks         = [];
-let allMembers       = [];
-let calendarMember   = "全部";   // ← 月曆人員 Tab 目前選的
-let selectedDate     = null;     // ← 點擊的日期
+let currentUser    = null;
+let currentDept    = "全部";
+let currentMode    = "list";
+let newTaskPinned  = false;
+let currentMonth   = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let allTasks       = [];
+let allMembers     = [];
+let calendarMember = "全部";
+let selectedDate   = null;
 
 const TYPE_HINTS = {
   "每週重複": "🔁 每週重複：每週一自動重置為未完成",
@@ -44,7 +44,6 @@ const TYPE_HINTS = {
 window.onTypeChange = () => {
   const type = document.getElementById("task-type").value;
   document.getElementById("type-hint").textContent = TYPE_HINTS[type] || "";
-  document.getElementById("task-date").placeholder = type === "單次截止" ? "截止日期（必填）" : "截止日期（選填）";
 };
 
 window.onAssigneeChange = () => {
@@ -100,14 +99,12 @@ function loadMembers() {
   onSnapshot(q, snapshot => {
     allMembers = snapshot.docs.map(d => d.data()).filter(m => m.name && m.email);
 
-    // 新增任務下拉
     const sel = document.getElementById("task-assignee");
     const cur = sel.value;
     sel.innerHTML = '<option value="">選擇負責人</option>' +
       allMembers.map(m => `<option value="${m.name}" data-email="${m.email}">${m.name}</option>`).join("");
     if (cur) sel.value = cur;
 
-    // 月曆人員 Tab
     renderCalendarMemberTabs();
   });
 }
@@ -182,7 +179,9 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
   document.getElementById("task-title").value          = "";
   document.getElementById("task-assignee").value       = "";
   document.getElementById("task-assignee-email").value = "";
-  document.getElementById("task-date").value           = "";
+  const dateEl = document.getElementById("task-date");
+  dateEl.value = "";
+  dateEl.type  = "text";
   setPinBtn(false);
 });
 
@@ -252,7 +251,6 @@ function getFiltered() {
   return list;
 }
 
-// 月曆用的篩選（依 calendarMember）
 function getCalendarFiltered() {
   let list = [...allTasks];
   if (calendarMember !== "全部") list = list.filter(t => t.assignee === calendarMember);
@@ -439,7 +437,6 @@ function renderCalendar() {
     cell.dataset.date = dateStr;
 
     if (mobile) {
-      // 手機：圓點模式
       const dots = dayTasks.length > 0
         ? `<div class="day-dots">${dayTasks.slice(0,3).map(t =>
             `<span class="day-dot${t.pinned ? " pin" : ""}"></span>`
@@ -463,7 +460,6 @@ function renderCalendar() {
         });
       }
     } else {
-      // 電腦：原本的 event chip 模式
       cell.innerHTML = `<div class="day-num">${d.getDate()}</div><div class="day-events"></div>`;
       const evWrap = cell.querySelector(".day-events");
       dayTasks.slice(0, 2).forEach(t => {
