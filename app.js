@@ -35,6 +35,8 @@ let allMembers     = [];
 let calendarMember = "全部";
 let selectedDate   = null;
 
+const LIST_LIMIT = 20;
+
 const TYPE_HINTS = {
   "每週重複": "🔁 每週重複：每週一自動重置為未完成",
   "每月重複": "📆 每月重複：每月 1 日自動重置為未完成",
@@ -287,21 +289,68 @@ function renderPinned() {
   `).join("");
 }
 
+// ─── 清單（完成隱藏 + 展開）──────────────────────
+
 function renderList() {
   const wl = document.getElementById("weekly-list");
   const ml = document.getElementById("monthly-list");
   const ol = document.getElementById("once-list");
   wl.innerHTML = ml.innerHTML = ol.innerHTML = "";
+
   const filtered = getFiltered();
   const weekly  = filtered.filter(t => t.taskType === "每週重複");
   const monthly = filtered.filter(t => t.taskType === "每月重複");
   const once    = filtered.filter(t => t.taskType === "單次截止" || !t.taskType);
-  if (!weekly.length)  wl.innerHTML = '<div class="empty">目前無每週重複待辦</div>';
-  if (!monthly.length) ml.innerHTML = '<div class="empty">目前無每月重複待辦</div>';
-  if (!once.length)    ol.innerHTML = '<div class="empty">目前無單次截止待辦</div>';
-  weekly.forEach(t  => wl.appendChild(createItem(t)));
-  monthly.forEach(t => ml.appendChild(createItem(t)));
-  once.forEach(t    => ol.appendChild(createItem(t)));
+
+  renderTaskGroup(wl, weekly,  "目前無每週重複待辦");
+  renderTaskGroup(ml, monthly, "目前無每月重複待辦");
+  renderTaskGroup(ol, once,    "目前無單次截止待辦");
+}
+
+function renderTaskGroup(ul, tasks, emptyMsg) {
+  const todo = tasks.filter(t => !t.done);
+  const done = tasks.filter(t =>  t.done);
+
+  if (!tasks.length) {
+    ul.innerHTML = `<div class="empty">${emptyMsg}</div>`;
+    return;
+  }
+
+  // 未完成
+  if (!todo.length) {
+    ul.insertAdjacentHTML("beforeend", `<div class="empty">全部已完成 ✅</div>`);
+  }
+  todo.slice(0, LIST_LIMIT).forEach(t => ul.appendChild(createItem(t)));
+  if (todo.length > LIST_LIMIT) {
+    ul.insertAdjacentHTML("beforeend",
+      `<div class="list-more">還有 ${todo.length - LIST_LIMIT} 項，請使用篩選器縮小範圍</div>`);
+  }
+
+  // 已完成 — 預設收合
+  if (done.length) {
+    const toggleId = `done-${Math.random().toString(36).slice(2)}`;
+    const toggle = document.createElement("div");
+    toggle.className = "done-toggle";
+    toggle.innerHTML = `<span>✅ 已完成 ${done.length} 項</span><span class="done-arrow">▶</span>`;
+    toggle.addEventListener("click", () => {
+      const box = document.getElementById(toggleId);
+      const arrow = toggle.querySelector(".done-arrow");
+      const open  = box.style.display !== "none";
+      box.style.display  = open ? "none" : "block";
+      arrow.textContent  = open ? "▶" : "▼";
+    });
+    ul.appendChild(toggle);
+
+    const doneBox = document.createElement("div");
+    doneBox.id            = toggleId;
+    doneBox.style.display = "none";
+    done.slice(0, LIST_LIMIT).forEach(t => doneBox.appendChild(createItem(t)));
+    if (done.length > LIST_LIMIT) {
+      doneBox.insertAdjacentHTML("beforeend",
+        `<div class="list-more">還有 ${done.length - LIST_LIMIT} 項已完成</div>`);
+    }
+    ul.appendChild(doneBox);
+  }
 }
 
 function createItem(task) {
@@ -470,8 +519,8 @@ function renderCalendar() {
       });
       if (dayTasks.length > 2) {
         const more = document.createElement("div");
-        more.className   = "event-chip";
-        more.textContent = `+${dayTasks.length - 2}`;
+        more.className   = "event-chip more";
+        more.textContent = `+${dayTasks.length - 2} 項`;
         evWrap.appendChild(more);
       }
     }

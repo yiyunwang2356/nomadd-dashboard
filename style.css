@@ -98,6 +98,16 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
 .row-actions    { display:flex; gap:2px; flex-shrink:0; }
 .muted          { font-size:.78rem; color:#7A6E66; }
 
+/* ── 已完成收合 ───────────────────────────────── */
+.done-toggle { display:flex; justify-content:space-between; align-items:center;
+  padding:8px 12px; background:#F7F3EF; border:1px dashed #E7DDD0; border-radius:8px;
+  cursor:pointer; font-size:.82rem; font-weight:600; color:#7A6E66;
+  margin-top:4px; user-select:none; transition:.15s; }
+.done-toggle:hover { border-color:#C96F16; color:#C96F16; }
+.done-arrow { font-size:.7rem; }
+.list-more { font-size:.78rem; color:#C96F16; padding:8px 4px;
+  font-weight:600; border-top:1px dashed #f0cda3; margin-top:4px; }
+
 /* ── Tags ─────────────────────────────────────── */
 .tag       { font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:20px; }
 .tag-dept  { background:#F0EBE5; color:#4B443D; }
@@ -135,7 +145,7 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
 .weekday  { text-align:center; font-size:.75rem; font-weight:700;
   color:#7A6E66; padding:6px 0; }
 .day-cell { border:1px solid #F0EBE5; border-radius:8px; padding:6px;
-  min-height:80px; background:#FAFAF9; cursor:default; transition:.15s; }
+  height:100px; overflow:hidden; background:#FAFAF9; cursor:default; transition:.15s; }
 .day-cell:hover       { border-color:#C96F16; }
 .day-cell.other-month { opacity:.38; }
 .day-cell.selected    { border-color:#C96F16; background:#FFF8F2; }
@@ -144,8 +154,9 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
 /* ── Event Chips（電腦）──────────────────────── */
 .day-events  { display:flex; flex-direction:column; gap:2px; }
 .event-chip  { font-size:.68rem; background:#F0EBE5; color:#4B443D; border-radius:4px;
-  padding:2px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.event-chip.pin { background:#FFF3E8; color:#C96F16; font-weight:700; }
+  padding:2px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.event-chip.pin  { background:#FFF3E8; color:#C96F16; font-weight:700; }
+.event-chip.more { background:#F0EBE5; color:#7A6E66; font-weight:700; }
 
 /* ── 手機圓點 ─────────────────────────────────── */
 .day-dots     { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; align-items:center; }
@@ -176,7 +187,6 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
   header         { flex-direction:column; }
   .toolbar       { gap:6px; }
 
-  /* 新增表單手機單欄 */
   .add-grid      { grid-template-columns:1fr; }
   .add-grid input, .add-grid select,
   .add-grid .primary-btn, .add-grid .ghost-btn { width:100%; max-width:100%; }
@@ -184,8 +194,7 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
   .add-grid input[type="text"]#task-date { width:100%; min-width:0;
     padding:0 10px; -webkit-appearance:none; appearance:none; }
 
-  /* 手機月曆格縮小 */
-  .day-cell      { min-height:52px; padding:4px; }
+  .day-cell      { min-height:52px; height:auto; padding:4px; }
   .day-num       { font-size:.72rem; }
   .cal-member-tabs { gap:4px; }
   .cal-tab-btn   { padding:4px 10px; font-size:.75rem; }
