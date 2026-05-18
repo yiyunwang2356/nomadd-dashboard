@@ -37,15 +37,20 @@ let selectedDate   = null;
 
 const LIST_LIMIT = 20;
 
+const DAY_NAMES = ["週日","週一","週二","週三","週四","週五","週六"];
+
 const TYPE_HINTS = {
-  "每週重複": "🔁 每週重複：每週一自動重置為未完成",
-  "每月重複": "📆 每月重複：每月 1 日自動重置為未完成",
+  "每週重複": "🔁 每週重複：依設定星期自動重置為未完成",
+  "每月重複": "📆 每月重複：依設定日期自動重置為未完成",
   "單次截止": "📌 單次截止：只有一個 deadline，完成後不重置"
 };
 
 window.onTypeChange = () => {
   const type = document.getElementById("task-type").value;
-  document.getElementById("type-hint").textContent = TYPE_HINTS[type] || "";
+  document.getElementById("type-hint").textContent              = TYPE_HINTS[type] || "";
+  document.getElementById("task-repeat-day").style.display  = type === "每週重複" ? "block" : "none";
+  document.getElementById("task-repeat-date").style.display = type === "每月重複" ? "block" : "none";
+  document.getElementById("task-date").style.display        = type === "單次截止" ? "block" : "none";
 };
 
 window.onAssigneeChange = () => {
@@ -87,6 +92,8 @@ onAuthStateChanged(auth, async user => {
 
     const adminCheck = isAdmin(user.email);
     document.getElementById("add-task-form").style.display = adminCheck ? "block" : "none";
+    // 初始化欄位顯示
+    onTypeChange();
     loadMembers();
     loadTasks();
   } else {
@@ -133,16 +140,22 @@ function renderCalendarMemberTabs() {
 async function autoReset(tasks) {
   const today    = new Date();
   const todayStr = fmtDate(today);
-  const isMonday = today.getDay() === 1;
-  const isFirst  = today.getDate() === 1;
   for (const task of tasks) {
     if (!task.done) continue;
     const lastReset = task.lastResetDate || "";
-    if (task.taskType === "每週重複" && isMonday && lastReset !== todayStr) {
-      await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+    if (lastReset === todayStr) continue;
+
+    if (task.taskType === "每週重複") {
+      const targetDay = task.repeatDay ?? 1;
+      if (today.getDay() === targetDay) {
+        await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+      }
     }
-    if (task.taskType === "每月重複" && isFirst && lastReset !== todayStr) {
-      await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+    if (task.taskType === "每月重複") {
+      const targetDate = task.repeatDate ?? 1;
+      if (today.getDate() === targetDate) {
+        await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+      }
     }
   }
 }
@@ -164,13 +177,19 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
   const assignee      = document.getElementById("task-assignee").value.trim();
   const assigneeEmail = document.getElementById("task-assignee-email").value.trim();
   const dueDate       = document.getElementById("task-date").value;
+  const repeatDay     = parseInt(document.getElementById("task-repeat-day").value);
+  const repeatDate    = parseInt(document.getElementById("task-repeat-date").value);
+
   if (!title)    return alert("請輸入待辦事項名稱");
   if (!assignee) return alert("請選擇負責人");
   if (taskType === "單次截止" && !dueDate) return alert("單次截止任務請填入截止日期");
+
   await addDoc(collection(db, "tasks"), {
     title, dept, taskType,
     assignee, assigneeEmail,
     dueDate:       dueDate || "",
+    repeatDay:     taskType === "每週重複" ? repeatDay  : null,
+    repeatDate:    taskType === "每月重複" ? repeatDate : null,
     pinned:        newTaskPinned,
     done:          false,
     lastResetDate: "",
@@ -178,6 +197,7 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
     createdAt:     serverTimestamp(),
     updatedAt:     serverTimestamp()
   });
+
   document.getElementById("task-title").value          = "";
   document.getElementById("task-assignee").value       = "";
   document.getElementById("task-assignee-email").value = "";
@@ -255,22 +275,28 @@ function getFiltered() {
 
 // ─── 動態計算下一次截止日 ────────────────────────
 function getNextDueDate(task, referenceDate) {
-  // 每次都 new Date() 避免物件被污染
   const base = new Date(referenceDate || new Date());
   base.setHours(0, 0, 0, 0);
 
   if (task.taskType === "每週重複") {
+    const targetDay = task.repeatDay ?? 1;
     const day  = base.getDay();
-    const diff = day === 1 ? 0 : (1 - day + 7) % 7;
+    const diff = day === targetDay ? 0 : (targetDay - day + 7) % 7;
     const next = new Date(base);
     next.setDate(base.getDate() + diff);
     return fmtDate(next);
   }
 
   if (task.taskType === "每月重複") {
-    const next = base.getDate() === 1
-      ? new Date(base)
-      : new Date(base.getFullYear(), base.getMonth() + 1, 1);
+    const targetDate = task.repeatDate ?? 1;
+    let next;
+    if (base.getDate() === targetDate) {
+      next = new Date(base);
+    } else if (base.getDate() < targetDate) {
+      next = new Date(base.getFullYear(), base.getMonth(), targetDate);
+    } else {
+      next = new Date(base.getFullYear(), base.getMonth() + 1, targetDate);
+    }
     return fmtDate(next);
   }
 
@@ -305,12 +331,18 @@ function renderPinned() {
     <div class="pin-item">
       <div class="pin-top">
         <span class="pin-badge">PIN</span>
-        <span class="muted">${t.dueDate || "未設定"}</span>
+        <span class="muted">${repeatLabel(t)}</span>
       </div>
       <div style="font-weight:800;font-size:.92rem;margin-bottom:4px">${t.title}</div>
       <div class="muted">${t.dept}｜${t.assignee}｜${t.taskType}</div>
     </div>
   `).join("");
+}
+
+function repeatLabel(task) {
+  if (task.taskType === "每週重複") return DAY_NAMES[task.repeatDay ?? 1];
+  if (task.taskType === "每月重複") return `每月 ${task.repeatDate ?? 1} 號`;
+  return task.dueDate || "未設定";
 }
 
 function renderList() {
@@ -378,6 +410,11 @@ function createItem(task) {
   const li = document.createElement("li");
   li.className = "task-item" + (task.done ? " done" : "");
   const typeTag = task.taskType === "單次截止" ? '<span class="tag tag-once">單次</span>' : "";
+  const repeatInfo = task.taskType === "每週重複"
+    ? `<span class="tag tag-repeat">${DAY_NAMES[task.repeatDay ?? 1]}</span>`
+    : task.taskType === "每月重複"
+    ? `<span class="tag tag-repeat">每月 ${task.repeatDate ?? 1} 號</span>`
+    : "";
   li.innerHTML = `
     <input type="checkbox" ${task.done ? "checked" : ""} />
     <div class="task-content">
@@ -389,6 +426,7 @@ function createItem(task) {
       <div class="task-meta">
         <span class="tag tag-dept">${task.dept}</span>
         <span>👤 ${task.assignee}</span>
+        ${repeatInfo}
         ${task.dueDate ? `<span class="tag tag-date">${task.dueDate}</span>` : ""}
       </div>
     </div>
@@ -419,9 +457,19 @@ function enterEditMode(li, task) {
   const memberOptions = allMembers.map(m =>
     `<option value="${m.name}" data-email="${m.email}" ${m.name === task.assignee ? "selected" : ""}>${m.name}</option>`
   ).join("");
+
+  const weekOptions = ["週一","週二","週三","週四","週五","週六","週日"].map((d, i) => {
+    const val = i === 6 ? 0 : i + 1;
+    return `<option value="${val}" ${(task.repeatDay ?? 1) === val ? "selected" : ""}>${d}</option>`;
+  }).join("");
+
+  const dateOptions = Array.from({length:28}, (_,i) =>
+    `<option value="${i+1}" ${(task.repeatDate ?? 1) === i+1 ? "selected" : ""}>${i+1} 號</option>`
+  ).join("");
+
   li.innerHTML = `
     <div class="edit-form">
-      <input  class="edit-title" type="text" value="${task.title}" placeholder="待辦事項名稱" />
+      <input class="edit-title" type="text" value="${task.title}" placeholder="待辦事項名稱" />
       <select class="edit-dept">
         ${["行政","會計","PT","文宣","場地","行銷"].map(d =>
           `<option ${d === task.dept ? "selected" : ""}>${d}</option>`
@@ -432,33 +480,54 @@ function enterEditMode(li, task) {
           `<option ${t === task.taskType ? "selected" : ""}>${t}</option>`
         ).join("")}
       </select>
+      <select class="edit-repeat-day" style="${task.taskType === "每週重複" ? "" : "display:none"}">
+        ${weekOptions}
+      </select>
+      <select class="edit-repeat-date" style="${task.taskType === "每月重複" ? "" : "display:none"}">
+        ${dateOptions}
+      </select>
       <select class="edit-assignee">
         <option value="">選擇負責人</option>
         ${memberOptions}
       </select>
-      <input class="edit-date" type="date" value="${task.dueDate || ""}" />
+      <input class="edit-date" type="date" value="${task.dueDate || ""}"
+        style="${task.taskType === "單次截止" ? "" : "display:none"}" />
       <div class="edit-actions">
         <button class="primary-btn edit-save">✅ 儲存</button>
         <button class="ghost-btn edit-cancel">✖ 取消</button>
       </div>
     </div>
   `;
+
+  // 編輯模式 type 切換
+  li.querySelector(".edit-type").addEventListener("change", e => {
+    const t = e.target.value;
+    li.querySelector(".edit-repeat-day").style.display  = t === "每週重複" ? "block" : "none";
+    li.querySelector(".edit-repeat-date").style.display = t === "每月重複" ? "block" : "none";
+    li.querySelector(".edit-date").style.display        = t === "單次截止" ? "block" : "none";
+  });
+
   li.querySelector(".edit-cancel").addEventListener("click", () => renderAll());
   li.querySelector(".edit-save").addEventListener("click", async () => {
-    const newTitle    = li.querySelector(".edit-title").value.trim();
-    const newDept     = li.querySelector(".edit-dept").value;
-    const newType     = li.querySelector(".edit-type").value;
-    const newAssignee = li.querySelector(".edit-assignee").value;
-    const newDate     = li.querySelector(".edit-date").value;
-    const newEmail    = li.querySelector(".edit-assignee")
-                          .options[li.querySelector(".edit-assignee").selectedIndex]
-                          ?.dataset.email || "";
+    const newTitle     = li.querySelector(".edit-title").value.trim();
+    const newDept      = li.querySelector(".edit-dept").value;
+    const newType      = li.querySelector(".edit-type").value;
+    const newAssignee  = li.querySelector(".edit-assignee").value;
+    const newDate      = li.querySelector(".edit-date").value;
+    const newRepeatDay  = parseInt(li.querySelector(".edit-repeat-day").value);
+    const newRepeatDate = parseInt(li.querySelector(".edit-repeat-date").value);
+    const newEmail     = li.querySelector(".edit-assignee")
+                           .options[li.querySelector(".edit-assignee").selectedIndex]
+                           ?.dataset.email || "";
     if (!newTitle)    return alert("請輸入待辦事項名稱");
     if (!newAssignee) return alert("請選擇負責人");
     await updateDoc(doc(db, "tasks", task.id), {
       title: newTitle, dept: newDept, taskType: newType,
       assignee: newAssignee, assigneeEmail: newEmail,
-      dueDate: newDate || "", updatedAt: serverTimestamp()
+      dueDate:     newDate || "",
+      repeatDay:   newType === "每週重複" ? newRepeatDay  : null,
+      repeatDate:  newType === "每月重複" ? newRepeatDate : null,
+      updatedAt:   serverTimestamp()
     });
   });
 }
@@ -498,9 +567,7 @@ function renderCalendar() {
     else
       { d = new Date(year, month, i - firstDay + 1); }
 
-    const dateStr = fmtDate(d);
-
-    // 每個格子獨立 new Date，避免物件污染
+    const dateStr  = fmtDate(d);
     const dayTasks = filtered.filter(t =>
       getNextDueDate(t, new Date(d.getFullYear(), d.getMonth(), d.getDate())) === dateStr
     );
@@ -565,7 +632,7 @@ function showDayDetail(dateStr, tasks) {
   list.innerHTML = tasks.map(t => `
     <li class="cal-day-task-item ${t.done ? "done" : ""}">
       <span class="cal-day-task-title">${t.done ? "✅" : "⬜"} ${t.title}</span>
-      <span class="cal-day-task-meta">${t.dept}｜👤 ${t.assignee}</span>
+      <span class="cal-day-task-meta">${t.dept}｜👤 ${t.assignee}｜${repeatLabel(t)}</span>
     </li>
   `).join("");
   wrap.style.display = "block";
