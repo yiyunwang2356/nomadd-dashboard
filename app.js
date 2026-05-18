@@ -255,12 +255,12 @@ function getFiltered() {
 
 // ─── 動態計算下一次截止日 ────────────────────────
 function getNextDueDate(task, referenceDate) {
-  const base = referenceDate || new Date();
-  base.setHours(0,0,0,0);
+  // 每次都 new Date() 避免物件被污染
+  const base = new Date(referenceDate || new Date());
+  base.setHours(0, 0, 0, 0);
 
   if (task.taskType === "每週重複") {
     const day  = base.getDay();
-    // 今天是週一就顯示今天，否則找下一個週一
     const diff = day === 1 ? 0 : (1 - day + 7) % 7;
     const next = new Date(base);
     next.setDate(base.getDate() + diff);
@@ -268,7 +268,6 @@ function getNextDueDate(task, referenceDate) {
   }
 
   if (task.taskType === "每月重複") {
-    // 今天是 1 號就顯示今天，否則找下個月 1 號
     const next = base.getDate() === 1
       ? new Date(base)
       : new Date(base.getFullYear(), base.getMonth() + 1, 1);
@@ -354,7 +353,7 @@ function renderTaskGroup(ul, tasks, emptyMsg) {
     toggle.className = "done-toggle";
     toggle.innerHTML = `<span>✅ 已完成 ${done.length} 項</span><span class="done-arrow">▶</span>`;
     toggle.addEventListener("click", () => {
-      const box  = document.getElementById(toggleId);
+      const box   = document.getElementById(toggleId);
       const arrow = toggle.querySelector(".done-arrow");
       const open  = box.style.display !== "none";
       box.style.display = open ? "none" : "block";
@@ -492,17 +491,21 @@ function renderCalendar() {
 
   for (let i = 0; i < 42; i++) {
     let d, cur = true;
-    if (i < firstDay)                     { d = new Date(year, month-1, prevDays - firstDay + i + 1); cur = false; }
-    else if (i >= firstDay + daysInMonth) { d = new Date(year, month+1, i - (firstDay + daysInMonth) + 1); cur = false; }
-    else                                  { d = new Date(year, month, i - firstDay + 1); }
+    if (i < firstDay)
+      { d = new Date(year, month - 1, prevDays - firstDay + i + 1); cur = false; }
+    else if (i >= firstDay + daysInMonth)
+      { d = new Date(year, month + 1, i - (firstDay + daysInMonth) + 1); cur = false; }
+    else
+      { d = new Date(year, month, i - firstDay + 1); }
 
-    const dateStr  = fmtDate(d);
-    const cellDate = new Date(d);
+    const dateStr = fmtDate(d);
 
-    // 用 getNextDueDate 動態比對
-    const dayTasks = filtered.filter(t => getNextDueDate(t, new Date(cellDate)) === dateStr);
+    // 每個格子獨立 new Date，避免物件污染
+    const dayTasks = filtered.filter(t =>
+      getNextDueDate(t, new Date(d.getFullYear(), d.getMonth(), d.getDate())) === dateStr
+    );
+
     const isSelected = selectedDate === dateStr;
-
     const cell = document.createElement("div");
     cell.className = "day-cell" +
       (cur ? "" : " other-month") +
@@ -513,7 +516,8 @@ function renderCalendar() {
       const dots = dayTasks.length > 0
         ? `<div class="day-dots">${dayTasks.slice(0,3).map(t =>
             `<span class="day-dot${t.pinned ? " pin" : ""}"></span>`
-          ).join("")}${dayTasks.length > 3 ? `<span class="day-dot-more">+${dayTasks.length - 3}</span>` : ""}</div>`
+          ).join("")}${dayTasks.length > 3
+            ? `<span class="day-dot-more">+${dayTasks.length - 3}</span>` : ""}</div>`
         : "";
       cell.innerHTML = `<div class="day-num">${d.getDate()}</div>${dots}`;
 
