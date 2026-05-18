@@ -253,6 +253,31 @@ function getFiltered() {
   return list;
 }
 
+// ─── 動態計算下一次截止日 ────────────────────────
+function getNextDueDate(task, referenceDate) {
+  const base = referenceDate || new Date();
+  base.setHours(0,0,0,0);
+
+  if (task.taskType === "每週重複") {
+    const day  = base.getDay();
+    // 今天是週一就顯示今天，否則找下一個週一
+    const diff = day === 1 ? 0 : (1 - day + 7) % 7;
+    const next = new Date(base);
+    next.setDate(base.getDate() + diff);
+    return fmtDate(next);
+  }
+
+  if (task.taskType === "每月重複") {
+    // 今天是 1 號就顯示今天，否則找下個月 1 號
+    const next = base.getDate() === 1
+      ? new Date(base)
+      : new Date(base.getFullYear(), base.getMonth() + 1, 1);
+    return fmtDate(next);
+  }
+
+  return task.dueDate || "";
+}
+
 function getCalendarFiltered() {
   let list = [...allTasks];
   if (calendarMember !== "全部") list = list.filter(t => t.assignee === calendarMember);
@@ -289,8 +314,6 @@ function renderPinned() {
   `).join("");
 }
 
-// ─── 清單（完成隱藏 + 展開）──────────────────────
-
 function renderList() {
   const wl = document.getElementById("weekly-list");
   const ml = document.getElementById("monthly-list");
@@ -316,7 +339,6 @@ function renderTaskGroup(ul, tasks, emptyMsg) {
     return;
   }
 
-  // 未完成
   if (!todo.length) {
     ul.insertAdjacentHTML("beforeend", `<div class="empty">全部已完成 ✅</div>`);
   }
@@ -326,18 +348,17 @@ function renderTaskGroup(ul, tasks, emptyMsg) {
       `<div class="list-more">還有 ${todo.length - LIST_LIMIT} 項，請使用篩選器縮小範圍</div>`);
   }
 
-  // 已完成 — 預設收合
   if (done.length) {
     const toggleId = `done-${Math.random().toString(36).slice(2)}`;
     const toggle = document.createElement("div");
     toggle.className = "done-toggle";
     toggle.innerHTML = `<span>✅ 已完成 ${done.length} 項</span><span class="done-arrow">▶</span>`;
     toggle.addEventListener("click", () => {
-      const box = document.getElementById(toggleId);
+      const box  = document.getElementById(toggleId);
       const arrow = toggle.querySelector(".done-arrow");
       const open  = box.style.display !== "none";
-      box.style.display  = open ? "none" : "block";
-      arrow.textContent  = open ? "▶" : "▼";
+      box.style.display = open ? "none" : "block";
+      arrow.textContent = open ? "▶" : "▼";
     });
     ul.appendChild(toggle);
 
@@ -476,7 +497,10 @@ function renderCalendar() {
     else                                  { d = new Date(year, month, i - firstDay + 1); }
 
     const dateStr  = fmtDate(d);
-    const dayTasks = filtered.filter(t => t.dueDate === dateStr);
+    const cellDate = new Date(d);
+
+    // 用 getNextDueDate 動態比對
+    const dayTasks = filtered.filter(t => getNextDueDate(t, new Date(cellDate)) === dateStr);
     const isSelected = selectedDate === dateStr;
 
     const cell = document.createElement("div");
