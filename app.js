@@ -1,7 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
-  getRedirectResult, signOut, onAuthStateChanged
+  getRedirectResult, setPersistence, browserLocalPersistence,
+  signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, onSnapshot,
@@ -26,6 +27,8 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
+setPersistence(auth, browserLocalPersistence).catch(showLoginError);
+
 let currentUser    = null;
 let currentDept    = "全部";
 let currentMode    = "list";
@@ -35,6 +38,7 @@ let allTasks       = [];
 let allMembers     = [];
 let calendarMember = "全部";
 let selectedDate   = null;
+let handledAuthUid = null;
 
 const LIST_LIMIT = 20;
 
@@ -82,7 +86,11 @@ function showLoginError(error) {
   alert("登入失敗：" + (error?.message || "請稍後再試"));
 }
 
-getRedirectResult(auth).catch(showLoginError);
+getRedirectResult(auth)
+  .then(result => {
+    if (result?.user) handleSignedInUser(result.user);
+  })
+  .catch(showLoginError);
 
 document.getElementById("google-login-btn").addEventListener("click", async () => {
   const provider = createGoogleProvider();
@@ -91,44 +99,57 @@ document.getElementById("google-login-btn").addEventListener("click", async () =
       await signInWithRedirect(auth, provider);
       return;
     }
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    if (result?.user) await handleSignedInUser(result.user);
   } catch (e) {
+    if (e?.code === "auth/cancelled-popup-request" || e?.code === "auth/popup-blocked") {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     showLoginError(e);
   }
 });
 
 document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
 
+async function handleSignedInUser(user) {
+  if (!user) return;
+  if (handledAuthUid === user.uid) return;
+  handledAuthUid = user.uid;
+  if (!isAllowed(user.email)) {
+    alert("此帳號沒有存取權限，請使用公司帳號登入。");
+    await signOut(auth);
+    return;
+  }
+  currentUser = user;
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("main-app").style.display     = "block";
+  document.getElementById("user-name").textContent      = user.displayName || user.email;
+
+  const userRef = doc(db, "users", user.uid);
+  const snap    = await getDoc(userRef);
+  if (!snap.exists()) {
+    await setDoc(userRef, {
+      name: user.displayName || "", email: user.email,
+      role: isAdmin(user.email) ? "admin" : "staff",
+      createdAt: serverTimestamp()
+    });
+  }
+
+  const adminCheck = isAdmin(user.email);
+  document.getElementById("add-task-form").style.display = adminCheck ? "block" : "none";
+  // 初始化欄位顯示
+  onTypeChange();
+  loadMembers();
+  loadTasks();
+}
+
 onAuthStateChanged(auth, async user => {
   if (user) {
-    if (!isAllowed(user.email)) {
-      alert("此帳號沒有存取權限，請使用公司帳號登入。");
-      await signOut(auth);
-      return;
-    }
-    currentUser = user;
-    document.getElementById("login-screen").style.display = "none";
-    document.getElementById("main-app").style.display     = "block";
-    document.getElementById("user-name").textContent      = user.displayName || user.email;
-
-    const userRef = doc(db, "users", user.uid);
-    const snap    = await getDoc(userRef);
-    if (!snap.exists()) {
-      await setDoc(userRef, {
-        name: user.displayName || "", email: user.email,
-        role: isAdmin(user.email) ? "admin" : "staff",
-        createdAt: serverTimestamp()
-      });
-    }
-
-    const adminCheck = isAdmin(user.email);
-    document.getElementById("add-task-form").style.display = adminCheck ? "block" : "none";
-    // 初始化欄位顯示
-    onTypeChange();
-    loadMembers();
-    loadTasks();
+    await handleSignedInUser(user);
   } else {
     currentUser = null;
+    handledAuthUid = null;
     document.getElementById("login-screen").style.display = "flex";
     document.getElementById("main-app").style.display     = "none";
   }
