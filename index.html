@@ -23,7 +23,7 @@
       <header>
         <div class="brand">
           <h1>Nomadd Haus｜待辦管理系統</h1>
-          <p>重複任務自動重置 · 月曆檢視 · 緊急事項 Pin 置頂</p>
+          <p>重複任務自動重置 · 月曆檢視 · 緊急事項置頂</p>
         </div>
         <div class="user-area">
           <span class="pill" id="user-name"></span>
@@ -50,8 +50,8 @@
         </select>
         <select id="pin-filter">
           <option value="全部">全部事項</option>
-          <option value="onlyPinned">只看 Pin</option>
-          <option value="onlyUnpinned">不含 Pin</option>
+          <option value="onlyPinned">只看置頂</option>
+          <option value="onlyUnpinned">不含置頂</option>
         </select>
         <button class="mode-btn active" id="listModeBtn" onclick="switchMode('list')">清單</button>
         <button class="mode-btn" id="calendarModeBtn" onclick="switchMode('calendar')">月曆</button>
@@ -129,10 +129,10 @@
           <input type="email" id="task-assignee-email" placeholder="負責人 Email（自動帶入）" readonly />
           <input type="text" id="task-date" placeholder="截止日期 YYYY-MM-DD"
             onfocus="this.type='date'" onblur="if(!this.value)this.type='text'" />
-          <button class="ghost-btn" id="new-pin-btn">📌 未 Pin</button>
+          <button class="ghost-btn" id="new-pin-btn">📌 未置頂</button>
           <button class="primary-btn" id="add-task-btn">新增</button>
         </div>
-        <div id="type-hint" class="type-hint">🔁 每週重複：每週一自動重置為未完成</div>
+        <div id="type-hint" class="type-hint">🔁 每週重複：進入新的一週後，會自動取消完成勾選</div>
       </div>
 
       <div class="main-grid">

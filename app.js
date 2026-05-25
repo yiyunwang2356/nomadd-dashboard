@@ -40,9 +40,9 @@ const LIST_LIMIT = 20;
 const DAY_NAMES = ["週日","週一","週二","週三","週四","週五","週六"];
 
 const TYPE_HINTS = {
-  "每週重複": "🔁 每週重複：依設定星期自動重置為未完成",
-  "每月重複": "📆 每月重複：依設定日期自動重置為未完成",
-  "單次截止": "📌 單次截止：只有一個 deadline，完成後不重置"
+  "每週重複": "🔁 每週重複：進入新的一週後，會自動取消完成勾選",
+  "每月重複": "📆 每月重複：進入新的月份後，會自動取消完成勾選",
+  "單次截止": "📌 單次截止：只有一個截止日期，完成後不會自動重置"
 };
 
 window.onTypeChange = () => {
@@ -140,24 +140,52 @@ function renderCalendarMemberTabs() {
 async function autoReset(tasks) {
   const today    = new Date();
   const todayStr = fmtDate(today);
+  const currentWeekKey = getWeekKey(today);
+  const currentMonthKey = getMonthKey(today);
+
   for (const task of tasks) {
     if (!task.done) continue;
-    const lastReset = task.lastResetDate || "";
-    if (lastReset === todayStr) continue;
 
     if (task.taskType === "每週重複") {
-      const targetDay = task.repeatDay ?? 1;
-      if (today.getDay() === targetDay) {
-        await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+      if (task.lastResetCycle === currentWeekKey) continue;
+      const completedDate = getTaskCompletedDate(task);
+      if (completedDate && getWeekKey(completedDate) !== currentWeekKey) {
+        await updateDoc(doc(db, "tasks", task.id), {
+          done: false,
+          completedAt: null,
+          lastResetDate: todayStr,
+          lastResetCycle: currentWeekKey,
+          updatedAt: serverTimestamp()
+        });
       }
     }
+
     if (task.taskType === "每月重複") {
-      const targetDate = task.repeatDate ?? 1;
-      if (today.getDate() === targetDate) {
-        await updateDoc(doc(db, "tasks", task.id), { done: false, lastResetDate: todayStr, updatedAt: serverTimestamp() });
+      if (task.lastResetCycle === currentMonthKey) continue;
+      const completedDate = getTaskCompletedDate(task);
+      if (completedDate && getMonthKey(completedDate) !== currentMonthKey) {
+        await updateDoc(doc(db, "tasks", task.id), {
+          done: false,
+          completedAt: null,
+          lastResetDate: todayStr,
+          lastResetCycle: currentMonthKey,
+          updatedAt: serverTimestamp()
+        });
       }
     }
   }
+}
+
+function getTaskCompletedDate(task) {
+  return toDate(task.completedAt) || toDate(task.updatedAt) || toDate(task.createdAt);
+}
+
+function toDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  if (typeof value.seconds === "number") return new Date(value.seconds * 1000);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function loadTasks() {
@@ -182,7 +210,7 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
 
   if (!title)    return alert("請輸入待辦事項名稱");
   if (!assignee) return alert("請選擇負責人");
-  if (taskType === "單次截止" && !dueDate) return alert("單次截止任務請填入截止日期");
+  if (taskType === "單次截止" && !dueDate) return alert("單次截止任務請先填入截止日期");
 
   await addDoc(collection(db, "tasks"), {
     title, dept, taskType,
@@ -211,7 +239,7 @@ document.getElementById("new-pin-btn").addEventListener("click", () => setPinBtn
 function setPinBtn(state) {
   newTaskPinned = state;
   const btn = document.getElementById("new-pin-btn");
-  btn.textContent       = state ? "📌 已 Pin" : "📌 未 Pin";
+  btn.textContent       = state ? "📌 已置頂" : "📌 未置頂";
   btn.style.background  = state ? "#FFF3E8"   : "white";
   btn.style.borderColor = state ? "#f0cda3"   : "#E7DDD0";
   btn.style.color       = state ? "#C96F16"   : "#4B443D";
@@ -326,11 +354,11 @@ function renderAll() {
 function renderPinned() {
   const wrap   = document.getElementById("pinned-list");
   const pinned = getFiltered().filter(t => t.pinned);
-  if (!pinned.length) { wrap.innerHTML = '<div class="empty">目前沒有 Pin 事項</div>'; return; }
+  if (!pinned.length) { wrap.innerHTML = '<div class="empty">目前沒有置頂事項</div>'; return; }
   wrap.innerHTML = pinned.map(t => `
     <div class="pin-item">
       <div class="pin-top">
-        <span class="pin-badge">PIN</span>
+        <span class="pin-badge">置頂</span>
         <span class="muted">${repeatLabel(t)}</span>
       </div>
       <div style="font-weight:800;font-size:.92rem;margin-bottom:4px">${t.title}</div>
@@ -356,9 +384,9 @@ function renderList() {
   const monthly = filtered.filter(t => t.taskType === "每月重複");
   const once    = filtered.filter(t => t.taskType === "單次截止" || !t.taskType);
 
-  renderTaskGroup(wl, weekly,  "目前無每週重複待辦");
-  renderTaskGroup(ml, monthly, "目前無每月重複待辦");
-  renderTaskGroup(ol, once,    "目前無單次截止待辦");
+  renderTaskGroup(wl, weekly,  "目前沒有每週重複待辦");
+  renderTaskGroup(ml, monthly, "目前沒有每月重複待辦");
+  renderTaskGroup(ol, once,    "目前沒有單次截止待辦");
 }
 
 function renderTaskGroup(ul, tasks, emptyMsg) {
@@ -437,7 +465,11 @@ function createItem(task) {
     </div>
   `;
   li.querySelector("input[type=checkbox]").addEventListener("change", e =>
-    updateDoc(doc(db, "tasks", task.id), { done: e.target.checked, updatedAt: serverTimestamp() })
+    updateDoc(doc(db, "tasks", task.id), {
+      done: e.target.checked,
+      completedAt: e.target.checked ? serverTimestamp() : null,
+      updatedAt: serverTimestamp()
+    })
   );
   if (admin) {
     li.querySelector("[data-action=pin]")?.addEventListener("click", () =>
@@ -521,6 +553,7 @@ function enterEditMode(li, task) {
                            ?.dataset.email || "";
     if (!newTitle)    return alert("請輸入待辦事項名稱");
     if (!newAssignee) return alert("請選擇負責人");
+    if (newType === "單次截止" && !newDate) return alert("單次截止任務請先填入截止日期");
     await updateDoc(doc(db, "tasks", task.id), {
       title: newTitle, dept: newDept, taskType: newType,
       assignee: newAssignee, assigneeEmail: newEmail,
@@ -645,4 +678,20 @@ function hideDayDetail() {
 
 function fmtDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+
+function getWeekKey(date) {
+  return fmtDate(getWeekStart(date));
+}
+
+function getWeekStart(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const diffFromMonday = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - diffFromMonday);
+  return d;
+}
+
+function getMonthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
 }
