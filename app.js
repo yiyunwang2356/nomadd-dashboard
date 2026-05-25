@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+  getRedirectResult, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, onSnapshot,
@@ -59,11 +60,41 @@ window.onAssigneeChange = () => {
   document.getElementById("task-assignee-email").value = selected?.dataset.email || "";
 };
 
-document.getElementById("google-login-btn").addEventListener("click", async () => {
+function createGoogleProvider() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ hd: ALLOWED_DOMAIN, prompt: "select_account" });
-  try { await signInWithPopup(auth, provider); }
-  catch (e) { alert("登入失敗：" + e.message); }
+  return provider;
+}
+
+function isRedirectLoginDevice() {
+  return isMobile() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
+function showLoginError(error) {
+  if (error?.code === "auth/cancelled-popup-request") {
+    alert("登入視窗已被取消，請再按一次「使用 Google 登入」。");
+    return;
+  }
+  if (error?.code === "auth/popup-blocked") {
+    alert("瀏覽器阻擋了登入視窗，請允許彈出視窗後再試一次。");
+    return;
+  }
+  alert("登入失敗：" + (error?.message || "請稍後再試"));
+}
+
+getRedirectResult(auth).catch(showLoginError);
+
+document.getElementById("google-login-btn").addEventListener("click", async () => {
+  const provider = createGoogleProvider();
+  try {
+    if (isRedirectLoginDevice()) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    await signInWithPopup(auth, provider);
+  } catch (e) {
+    showLoginError(e);
+  }
 });
 
 document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
