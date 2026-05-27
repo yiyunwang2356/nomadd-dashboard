@@ -39,6 +39,7 @@ let allMembers     = [];
 let calendarMember = "全部";
 let selectedDate   = null;
 let handledAuthUid = null;
+let loginInProgress = false;
 
 const LIST_LIMIT = 20;
 
@@ -70,10 +71,6 @@ function createGoogleProvider() {
   return provider;
 }
 
-function isRedirectLoginDevice() {
-  return isMobile() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-}
-
 function showLoginError(error) {
   if (error?.code === "auth/cancelled-popup-request") {
     alert("登入視窗已被取消，請再按一次「使用 Google 登入」。");
@@ -93,12 +90,15 @@ getRedirectResult(auth)
   .catch(showLoginError);
 
 document.getElementById("google-login-btn").addEventListener("click", async () => {
+  if (loginInProgress) return;
+  loginInProgress = true;
+  const loginBtn = document.getElementById("google-login-btn");
+  const originalText = loginBtn.textContent;
+  loginBtn.disabled = true;
+  loginBtn.textContent = "登入中...";
+
   const provider = createGoogleProvider();
   try {
-    if (isRedirectLoginDevice()) {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
     const result = await signInWithPopup(auth, provider);
     if (result?.user) await handleSignedInUser(result.user);
   } catch (e) {
@@ -107,6 +107,10 @@ document.getElementById("google-login-btn").addEventListener("click", async () =
       return;
     }
     showLoginError(e);
+  } finally {
+    loginInProgress = false;
+    loginBtn.disabled = false;
+    loginBtn.textContent = originalText;
   }
 });
 
