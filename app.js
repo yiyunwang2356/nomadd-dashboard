@@ -65,6 +65,24 @@ window.onAssigneeChange = () => {
   document.getElementById("task-assignee-email").value = selected?.dataset.email || "";
 };
 
+function keepDatePickerInView(input) {
+  if (!input) return;
+  const bringIntoView = () => {
+    input.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+  };
+  input.addEventListener("pointerdown", bringIntoView);
+  input.addEventListener("focus", bringIntoView);
+}
+
+const newTaskDateInput = document.getElementById("task-date");
+keepDatePickerInView(newTaskDateInput);
+newTaskDateInput.addEventListener("focus", () => {
+  newTaskDateInput.type = "date";
+});
+newTaskDateInput.addEventListener("blur", () => {
+  if (!newTaskDateInput.value) newTaskDateInput.type = "text";
+});
+
 function createGoogleProvider() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ hd: ALLOWED_DOMAIN, prompt: "select_account" });
@@ -587,6 +605,9 @@ function enterEditMode(li, task) {
     </div>
   `;
 
+  li.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  keepDatePickerInView(li.querySelector(".edit-date"));
+
   // 編輯模式 type 切換
   li.querySelector(".edit-type").addEventListener("change", e => {
     const t = e.target.value;
@@ -677,21 +698,6 @@ function renderCalendar() {
         : "";
       cell.innerHTML = `<div class="day-num">${d.getDate()}</div>${dots}`;
 
-      if (cur && dayTasks.length > 0) {
-        cell.style.cursor = "pointer";
-        cell.addEventListener("click", () => {
-          if (selectedDate === dateStr) {
-            selectedDate = null;
-            hideDayDetail();
-            cell.classList.remove("selected");
-          } else {
-            selectedDate = dateStr;
-            document.querySelectorAll(".day-cell.selected").forEach(c => c.classList.remove("selected"));
-            cell.classList.add("selected");
-            showDayDetail(dateStr, dayTasks);
-          }
-        });
-      }
     } else {
       cell.innerHTML = `<div class="day-num">${d.getDate()}</div><div class="day-events"></div>`;
       const evWrap = cell.querySelector(".day-events");
@@ -709,11 +715,28 @@ function renderCalendar() {
       }
     }
 
+    if (cur && dayTasks.length > 0) {
+      cell.classList.add("has-tasks");
+      cell.style.cursor = "pointer";
+      cell.addEventListener("click", () => {
+        if (selectedDate === dateStr) {
+          selectedDate = null;
+          hideDayDetail();
+          cell.classList.remove("selected");
+        } else {
+          selectedDate = dateStr;
+          document.querySelectorAll(".day-cell.selected").forEach(c => c.classList.remove("selected"));
+          cell.classList.add("selected");
+          showDayDetail(dateStr, dayTasks, { scrollIntoView: !mobile });
+        }
+      });
+    }
+
     grid.appendChild(cell);
   }
 }
 
-function showDayDetail(dateStr, tasks) {
+function showDayDetail(dateStr, tasks, options = {}) {
   const wrap  = document.getElementById("cal-day-detail");
   const title = document.getElementById("cal-day-detail-title");
   const list  = document.getElementById("cal-day-task-list");
@@ -725,6 +748,9 @@ function showDayDetail(dateStr, tasks) {
     </li>
   `).join("");
   wrap.style.display = "block";
+  if (options.scrollIntoView) {
+    wrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 }
 
 function hideDayDetail() {

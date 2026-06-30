@@ -147,6 +147,7 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
 .day-cell { border:1px solid #F0EBE5; border-radius:8px; padding:6px;
   height:100px; overflow:hidden; background:#FAFAF9; cursor:default; transition:.15s; }
 .day-cell:hover       { border-color:#C96F16; }
+.day-cell.has-tasks:hover { background:#FFF8F2; }
 .day-cell.other-month { opacity:.38; }
 .day-cell.selected    { border-color:#C96F16; background:#FFF8F2; }
 .day-num  { font-size:.78rem; font-weight:700; color:#4B443D; margin-bottom:4px; }
