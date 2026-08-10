@@ -281,6 +281,7 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
   const dueDate       = document.getElementById("task-date").value;
   const repeatDay     = parseInt(document.getElementById("task-repeat-day").value);
   const repeatDate    = parseInt(document.getElementById("task-repeat-date").value);
+  const remindDailyUntilDue = document.getElementById("task-daily-reminder").checked;
 
   if (!title)    return alert("請輸入待辦事項名稱");
   if (!assignee) return alert("請選擇負責人");
@@ -292,6 +293,7 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
     dueDate:       dueDate || "",
     repeatDay:     taskType === "每週重複" ? repeatDay  : null,
     repeatDate:    taskType === "每月重複" ? repeatDate : null,
+    remindDailyUntilDue,
     pinned:        newTaskPinned,
     done:          false,
     lastResetDate: "",
@@ -303,6 +305,7 @@ document.getElementById("add-task-btn").addEventListener("click", async () => {
   document.getElementById("task-title").value          = "";
   document.getElementById("task-assignee").value       = "";
   document.getElementById("task-assignee-email").value = "";
+  document.getElementById("task-daily-reminder").checked = false;
   const dateEl = document.getElementById("task-date");
   dateEl.value = "";
   dateEl.type  = "text";
@@ -530,6 +533,7 @@ function createItem(task) {
         <span>👤 ${task.assignee}</span>
         ${repeatInfo}
         ${task.dueDate ? `<span class="tag tag-date">${task.dueDate}</span>` : ""}
+        ${task.remindDailyUntilDue ? '<span class="tag tag-reminder">每日提醒</span>' : ""}
       </div>
     </div>
     <div class="row-actions">
@@ -598,6 +602,10 @@ function enterEditMode(li, task) {
       </select>
       <input class="edit-date" type="date" value="${task.dueDate || ""}"
         style="${task.taskType === "單次截止" ? "" : "display:none"}" />
+      <label class="check-option edit-reminder-option">
+        <input class="edit-daily-reminder" type="checkbox" ${task.remindDailyUntilDue ? "checked" : ""} />
+        <span>每日提醒到執行日</span>
+      </label>
       <div class="edit-actions">
         <button class="primary-btn edit-save">✅ 儲存</button>
         <button class="ghost-btn edit-cancel">✖ 取消</button>
@@ -625,6 +633,7 @@ function enterEditMode(li, task) {
     const newDate      = li.querySelector(".edit-date").value;
     const newRepeatDay  = parseInt(li.querySelector(".edit-repeat-day").value);
     const newRepeatDate = parseInt(li.querySelector(".edit-repeat-date").value);
+    const newRemindDailyUntilDue = li.querySelector(".edit-daily-reminder").checked;
     const newEmail     = li.querySelector(".edit-assignee")
                            .options[li.querySelector(".edit-assignee").selectedIndex]
                            ?.dataset.email || "";
@@ -637,6 +646,7 @@ function enterEditMode(li, task) {
       dueDate:     newDate || "",
       repeatDay:   newType === "每週重複" ? newRepeatDay  : null,
       repeatDate:  newType === "每月重複" ? newRepeatDate : null,
+      remindDailyUntilDue: newRemindDailyUntilDue,
       updatedAt:   serverTimestamp()
     });
   });

@@ -65,6 +65,11 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
 .add-grid input:focus, .add-grid select:focus { outline:none; border-color:#C96F16; }
 .add-grid .primary-btn, .add-grid .ghost-btn { height:38px; padding:0 16px;
   font-size:.85rem; width:100%; min-width:0; }
+.check-option { display:flex; align-items:center; gap:8px; min-height:38px;
+  padding:8px 10px; border:1.5px solid #E7DDD0; border-radius:8px;
+  background:#fff; color:#4B443D; font-size:.82rem; font-weight:600; cursor:pointer; }
+.check-option input { width:15px; height:15px; accent-color:#C96F16; cursor:pointer; flex-shrink:0; }
+.add-grid .check-option { width:100%; }
 .type-hint { font-size:.78rem; color:#7A6E66; margin-top:10px; }
 
 /* ── Main Grid ────────────────────────────────── */
@@ -114,12 +119,15 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
 .tag-pin   { background:#FFF3E8; color:#C96F16; }
 .tag-once  { background:#EAF4FF; color:#2B6CB0; }
 .tag-date  { background:#F0FFF4; color:#276749; }
+.tag-reminder { background:#FFF7D6; color:#8A5A00; }
 
 /* ── Edit Form ────────────────────────────────── */
 .edit-form { display:flex; flex-wrap:wrap; gap:8px; width:100%; }
 .edit-form input, .edit-form select { border:1.5px solid #E7DDD0; border-radius:8px;
   padding:7px 10px; font-size:.83rem; background:#fff; }
+.edit-form .check-option input { width:15px; height:15px; padding:0; }
 .edit-title { flex:1 1 200px; }
+.edit-reminder-option { flex:1 1 170px; }
 .edit-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
 /* ── Pill ─────────────────────────────────────── */
