@@ -57,7 +57,7 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
 .add-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr));
   gap:10px; align-items:stretch; overflow:hidden; }
 .add-grid > * { min-width:0; max-width:100%; }
-.add-grid input, .add-grid select { border:1.5px solid #E7DDD0; border-radius:8px;
+.add-grid input:not([type="checkbox"]), .add-grid select { border:1.5px solid #E7DDD0; border-radius:8px;
   padding:8px 12px; font-size:.85rem; background:#fff; width:100%; height:38px;
   min-width:0; max-width:100%; box-sizing:border-box; }
 .add-grid input[type="date"],
@@ -67,10 +67,11 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
   font-size:.85rem; width:100%; min-width:0; }
 .check-option { display:flex; align-items:center; justify-content:flex-start; gap:8px; min-height:38px;
   padding:8px 10px; border:1.5px solid #E7DDD0; border-radius:8px;
-  background:#fff; color:#4B443D; font-size:.82rem; font-weight:600; cursor:pointer; }
+  background:#fff; color:#4B443D; font-size:.82rem; font-weight:600; cursor:pointer;
+  overflow:hidden; box-sizing:border-box; }
 .check-option input[type="checkbox"] { width:15px; height:15px; min-width:15px; max-width:15px;
   padding:0; margin:0; border:0; accent-color:#C96F16; cursor:pointer; flex-shrink:0; }
-.check-option span { line-height:1.2; white-space:nowrap; }
+.check-option span { min-width:0; line-height:1.2; white-space:normal; }
 .add-grid .check-option { width:100%; }
 .type-hint { font-size:.78rem; color:#7A6E66; margin-top:10px; }
 
@@ -200,11 +201,13 @@ header p  { font-size:.8rem; color:#7A6E66; margin-top:2px; }
   .toolbar       { gap:6px; }
 
   .add-grid      { grid-template-columns:1fr; }
-  .add-grid input, .add-grid select,
+  .add-grid input:not([type="checkbox"]), .add-grid select,
   .add-grid .primary-btn, .add-grid .ghost-btn { width:100%; max-width:100%; }
   .add-grid input[type="date"],
   .add-grid input[type="text"]#task-date { width:100%; min-width:0;
     padding:0 10px; -webkit-appearance:none; appearance:none; }
+  .add-grid .check-option { min-height:38px; height:auto; padding:8px 10px; align-items:center; }
+  .add-grid .check-option input[type="checkbox"] { width:15px; height:15px; min-width:15px; max-width:15px; }
 
   .day-cell      { min-height:52px; height:auto; padding:4px; }
   .day-num       { font-size:.72rem; }
